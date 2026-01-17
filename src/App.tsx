@@ -1,0 +1,442 @@
+import { useState } from 'react';
+import { Category, Phrase, ShadowingSettings, VoiceSettings, TranslationLanguage } from './types';
+import CategorySelector from './components/CategorySelector';
+import PhraseList from './components/PhraseList';
+import ShadowingPlayer from './components/ShadowingPlayer';
+import SettingsPage from './components/SettingsPage';
+import { mockPhrases } from './data/mockPhrases';
+import { generatePhrase } from './utils/aiPhraseGenerator';
+import { Upload, Settings } from 'lucide-react';
+import mammoth from 'mammoth';
+
+type View = 'main' | 'settings';
+
+function App() {
+  const [currentView, setCurrentView] = useState<View>('main');
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [phrases, setPhrases] = useState<Phrase[]>([]);
+  const [selectedPhrase, setSelectedPhrase] = useState<Phrase | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
+  
+  const [shadowingSettings, setShadowingSettings] = useState<ShadowingSettings>({
+    repetitions: 3,
+    intervalSeconds: 5,
+  });
+
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
+    gender: 'female',
+    accent: 'british',
+    rate: 'normal',
+  });
+
+  const [translationLanguage, setTranslationLanguage] = useState<TranslationLanguage>('el');
+
+  const handleCategorySelect = (category: Category) => {
+    setSelectedCategory(category);
+    setPhrases(mockPhrases[category]);
+    setSelectedPhrase(null);
+  };
+
+  const handleGeneratePhrase = async () => {
+    if (!selectedCategory) return;
+
+    setIsGenerating(true);
+    try {
+      // Get existing phrases to avoid duplicates
+      const existingTexts = phrases.map(p => p.text);
+      const newPhrase = await generatePhrase(selectedCategory, existingTexts);
+      
+      console.log('Generated phrase:', newPhrase);
+      console.log('Phrase source:', newPhrase.source);
+      
+      // Double-check for duplicates before adding
+      if (!phrases.some(p => p.text === newPhrase.text)) {
+        setPhrases((prev) => {
+          const updated = [newPhrase, ...prev];
+          console.log('Updated phrases count:', updated.length);
+          console.log('First phrase source:', updated[0]?.source);
+          return updated;
+        });
+        setSelectedPhrase(newPhrase);
+      } else {
+        console.warn('Duplicate phrase detected, generating another one...');
+        // Retry once
+        const retryPhrase = await generatePhrase(selectedCategory, [...existingTexts, newPhrase.text]);
+        setPhrases((prev) => [retryPhrase, ...prev]);
+        setSelectedPhrase(retryPhrase);
+      }
+    } catch (error) {
+      console.error('Error generating phrase:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('API key') || errorMessage.includes('not configured')) {
+        alert('OpenAI API key is not configured or invalid.\n\nPlease:\n1. Check your .env file\n2. Make sure the API key is correct\n3. Restart the dev server (npm run dev)');
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        alert('Invalid OpenAI API key.\n\nPlease check:\n1. Your API key is correct in .env\n2. Your OpenAI account has credits\n3. The API key hasn\'t been revoked');
+      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        alert('OpenAI API rate limit exceeded. Please wait a moment and try again.');
+      } else {
+        alert(`Failed to generate phrase: ${errorMessage}\n\nPlease check your OpenAI API key and account status.`);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateBatch = async (count: number) => {
+    if (!selectedCategory) return;
+
+    setIsGeneratingBatch(true);
+    try {
+      const newPhrases: Phrase[] = [];
+      const existingTexts = phrases.map(p => p.text);
+      
+      // Generate phrases in parallel for speed, but with retry logic
+      const generateWithRetry = async (attempt: number = 0): Promise<Phrase | null> => {
+        if (attempt >= 3) {
+          console.warn('Failed to generate unique phrase after 3 attempts');
+          return null;
+        }
+        
+        const allExistingTexts = [...existingTexts, ...newPhrases.map(p => p.text)];
+        try {
+          const phrase = await generatePhrase(selectedCategory, allExistingTexts);
+          
+          // Check for duplicates
+          if (!allExistingTexts.includes(phrase.text)) {
+            return phrase;
+          } else {
+            console.warn(`Duplicate detected, retrying (attempt ${attempt + 1})...`);
+            return await generateWithRetry(attempt + 1);
+          }
+        } catch (error) {
+          console.error(`Error generating phrase (attempt ${attempt + 1}):`, error);
+          if (attempt < 2) {
+            return await generateWithRetry(attempt + 1);
+          }
+          return null;
+        }
+      };
+      
+      // Generate all phrases in parallel (much faster!)
+      const promises = Array.from({ length: count }, () => generateWithRetry());
+      const results = await Promise.all(promises);
+      
+      // Filter out null results and ensure all have ai-generated source
+      for (const result of results) {
+        if (result) {
+          // Ensure source is ai-generated
+          if (result.source !== 'ai-generated') {
+            result.source = 'ai-generated';
+          }
+          newPhrases.push(result);
+        }
+      }
+      
+      if (newPhrases.length > 0) {
+        console.log(`Generated ${newPhrases.length}/${count} phrases:`, newPhrases.map(p => ({ text: p.text, source: p.source })));
+        setPhrases((prev) => {
+          const updated = [...newPhrases, ...prev];
+          console.log('Updated phrases after batch:', updated.length);
+          return updated;
+        });
+        setSelectedPhrase(newPhrases[0]);
+      } else {
+        console.warn('No phrases were generated successfully');
+        alert(`Failed to generate phrases. Only ${newPhrases.length} out of ${count} were created. Please check your OpenAI API key and try again.`);
+      }
+    } catch (error) {
+      console.error('Error generating batch phrases:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('API key')) {
+        alert('OpenAI API key is not configured or invalid. Please check your .env file and restart the dev server.');
+      } else {
+        alert(`Failed to generate phrases: ${errorMessage}`);
+      }
+    } finally {
+      setIsGeneratingBatch(false);
+    }
+  };
+
+  const handleToggleFavorite = (phraseId: string) => {
+    setPhrases((prev) =>
+      prev.map((phrase) =>
+        phrase.id === phraseId
+          ? { ...phrase, isFavorite: !phrase.isFavorite }
+          : phrase
+      )
+    );
+    // Update selected phrase if it's the one being favorited
+    if (selectedPhrase?.id === phraseId) {
+      setSelectedPhrase({
+        ...selectedPhrase,
+        isFavorite: !selectedPhrase.isFavorite,
+      });
+    }
+  };
+
+  const handleShuffle = () => {
+    if (!selectedCategory || phrases.length === 0) return;
+    
+    // Shuffle ALL phrases (standard, AI-generated, and uploaded) together
+    const shuffled = [...phrases];
+    
+    // Fisher-Yates shuffle algorithm for better randomness
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    setPhrases(shuffled);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    const isTxt = file.name.endsWith('.txt');
+    const isDocx = file.name.endsWith('.docx');
+    const isDoc = file.name.endsWith('.doc');
+    
+    if (!isTxt && !isDocx && !isDoc) {
+      alert('Please select a .txt, .docx, or .doc file');
+      return;
+    }
+
+    try {
+      let text = '';
+
+      if (isTxt) {
+        // Handle .txt files
+        const reader = new FileReader();
+        
+        text = await new Promise<string>((resolve, reject) => {
+          reader.onload = (e) => {
+            resolve(e.target?.result as string);
+          };
+          reader.onerror = () => reject(new Error('Error reading file'));
+          reader.readAsText(file, 'UTF-8');
+        });
+      } else if (isDocx) {
+        // Handle .docx files using mammoth
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        text = result.value;
+      } else if (isDoc) {
+        // Handle .doc files - try to read as text first (may not work for binary .doc)
+        // For binary .doc files, this is a limitation - ideally would need a library like js-word
+        // For now, we'll try to read as text which works for some .doc files saved as text
+        try {
+          const reader = new FileReader();
+          text = await new Promise<string>((resolve, reject) => {
+            reader.onload = (e) => {
+              const result = e.target?.result as string;
+              // Check if the result looks like binary data (contains non-printable characters)
+              if (result && /[\x00-\x08\x0E-\x1F]/.test(result)) {
+                reject(new Error('Binary .doc files are not fully supported. Please convert to .docx or .txt format.'));
+              } else {
+                resolve(result);
+              }
+            };
+            reader.onerror = () => reject(new Error('Error reading .doc file'));
+            // Try reading as text - works for some .doc files
+            reader.readAsText(file, 'UTF-8');
+          });
+        } catch (docError) {
+          // If reading as text fails, inform the user
+          alert('Unable to read .doc file. Binary .doc files require conversion to .docx or .txt format. Please convert your file and try again.');
+          throw docError;
+        }
+      }
+
+      if (!text || text.trim().length === 0) {
+        alert('The file is empty or could not be read');
+        return;
+      }
+
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length === 0) {
+        alert('No phrases found in the file');
+        return;
+      }
+
+      const timestamp = Date.now();
+      const newPhrases: Phrase[] = lines.map((line, index) => ({
+        id: `upload-${timestamp}-${index}`,
+        text: line.trim(),
+        category: selectedCategory || 'business',
+        source: 'uploaded',
+        isFavorite: false,
+      }));
+
+      // Add uploaded phrases to the beginning of the list so they're visible
+      setPhrases((prev) => [...newPhrases, ...prev]);
+      if (newPhrases.length > 0) {
+        setSelectedPhrase(newPhrases[0]);
+        console.log(`✅ Uploaded ${newPhrases.length} phrases`);
+        
+        // Show success message
+        alert(`✅ Successfully uploaded ${newPhrases.length} phrases!\n\nThe phrases appear at the beginning of the list.`);
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error processing the file';
+      if (!errorMessage.includes('Binary .doc')) {
+        alert(`Error processing the file. Please make sure it's a valid .txt, .docx, or .doc file.\n\n${errorMessage}`);
+      }
+    }
+
+    // Reset input so same file can be uploaded again
+    event.target.value = '';
+  };
+
+  // Show settings page
+  if (currentView === 'settings') {
+    return (
+      <SettingsPage
+        shadowingSettings={shadowingSettings}
+        voiceSettings={voiceSettings}
+        translationLanguage={translationLanguage}
+        onShadowingSettingsChange={setShadowingSettings}
+        onVoiceSettingsChange={setVoiceSettings}
+        onTranslationLanguageChange={setTranslationLanguage}
+        onBack={() => setCurrentView('main')}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <header className="text-center mb-8 relative">
+          <button
+            onClick={() => setCurrentView('settings')}
+            className="absolute top-0 right-0 flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="hidden md:inline">Settings</span>
+          </button>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+            Shadow Fluent
+          </h1>
+          <p className="text-white/90 text-lg">
+            Practice language learning with the shadowing technique
+          </p>
+        </header>
+
+        <div className="space-y-6">
+          {/* Category Selection */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Select Category
+            </h2>
+            <CategorySelector
+              selectedCategory={selectedCategory}
+              onSelectCategory={handleCategorySelect}
+            />
+          </div>
+
+          {/* File Upload */}
+          <div className="bg-white rounded-xl shadow-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Upload className="w-4 h-4 text-primary-600" />
+                <h3 className="font-semibold text-gray-800 text-base">
+                  Upload Your Own Phrases File
+                </h3>
+              </div>
+              
+              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-primary-300 rounded-lg cursor-pointer bg-primary-50 hover:bg-primary-100 transition-colors">
+                <div className="flex flex-col items-center justify-center">
+                  <Upload className="w-5 h-5 mb-1 text-primary-600" />
+                  <p className="text-xs text-gray-700">
+                    <span className="font-semibold">Click to upload</span> or drag file here
+                  </p>
+                  <p className="text-xs text-gray-500">.txt or .docx files</p>
+                </div>
+                <input
+                  type="file"
+                  accept=".txt,.docx,.doc"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+              
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-semibold text-blue-900 mb-1">📋 File Format:</p>
+                <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
+                  <li>Each line = one phrase</li>
+                  <li>Empty lines are ignored</li>
+                  <li>Supports .txt and .docx files</li>
+                  <li>Example: <code className="bg-blue-100 px-1 rounded">Hello, how are you?</code></li>
+                </ul>
+              </div>
+          </div>
+
+          {/* Main Content */}
+          {selectedCategory && (
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Phrase List */}
+              <PhraseList
+                phrases={phrases}
+                selectedPhrase={selectedPhrase}
+                onSelectPhrase={setSelectedPhrase}
+                onGenerateNew={handleGeneratePhrase}
+                onGenerateBatch={handleGenerateBatch}
+                isGeneratingBatch={isGeneratingBatch}
+                onToggleFavorite={handleToggleFavorite}
+                onShuffle={handleShuffle}
+                isLoading={isGenerating}
+                translationLanguage={translationLanguage}
+              />
+
+              {/* Shadowing Player */}
+              {selectedPhrase ? (
+                <ShadowingPlayer
+                  phrase={selectedPhrase}
+                  settings={shadowingSettings}
+                  voiceSettings={voiceSettings}
+                  translationLanguage={translationLanguage}
+                  onComplete={() => {
+                    // Session completed
+                    console.log('Session completed');
+                  }}
+                  onNextPhrase={() => {
+                    // Find current phrase index
+                    const currentIndex = phrases.findIndex(p => p.id === selectedPhrase.id);
+                    if (currentIndex >= 0 && currentIndex < phrases.length - 1) {
+                      // Move to next phrase and auto-start
+                      const nextPhrase = phrases[currentIndex + 1];
+                      setSelectedPhrase(nextPhrase);
+                      // The ShadowingPlayer will detect the phrase change and auto-start
+                    }
+                  }}
+                  hasNextPhrase={
+                    phrases.findIndex(p => p.id === selectedPhrase.id) < phrases.length - 1
+                  }
+                />
+              ) : (
+                <div className="bg-white rounded-xl shadow-lg p-8 flex items-center justify-center min-h-[400px]">
+                  <p className="text-gray-500 text-center">
+                    Select a phrase to get started
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-12 py-6 text-center">
+          <p className="text-white font-semibold text-sm">
+            Crafted with ❤️ by Nicholas Exarchakos
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+export default App;

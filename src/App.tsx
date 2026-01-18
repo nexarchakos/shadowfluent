@@ -310,32 +310,45 @@ function App() {
   return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <header className="text-center mb-8 relative pt-8 md:pt-12">
+        <header className="text-center mb-8 relative pt-20 md:pt-16 lg:pt-12">
           {/* Logo - Top Left, aligned with H1 */}
-          <div className="absolute top-8 md:top-12 left-0 flex items-center">
-            <span className="text-sm md:text-base font-bold text-white">
-              Shadow Fluent
-            </span>
+          <div className="absolute top-4 md:top-8 lg:top-12 left-0 flex items-center">
+            <img 
+              src="/shadowfluent-logo.png" 
+              alt="Shadow Fluent Logo" 
+              className="h-16 md:h-20 lg:h-28 w-auto"
+              onError={(e) => {
+                // Fallback to text if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                if (!target.nextElementSibling) {
+                  const fallback = document.createElement('span');
+                  fallback.className = 'text-sm md:text-base font-bold text-white';
+                  fallback.textContent = 'Shadow Fluent';
+                  target.parentElement?.appendChild(fallback);
+                }
+              }}
+            />
           </div>
           
           {/* Settings Button - Top Right, aligned with H1 */}
-          <div className="absolute top-8 md:top-12 right-0 flex items-center">
+          <div className="absolute top-4 md:top-8 lg:top-12 right-0 flex items-center">
             <button
               onClick={() => setCurrentView('settings')}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+              className="flex items-center gap-2 px-3 md:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium text-sm md:text-base"
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4 md:w-5 md:h-5" />
               <span className="hidden md:inline">Settings</span>
             </button>
           </div>
           
           {/* Main Heading - Center, single line */}
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 whitespace-nowrap">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 px-4 md:px-8 lg:px-0">
             English Shadowing App for Fluency
           </h1>
           
           {/* Subtitle */}
-          <h2 className="text-white/90 text-lg md:text-xl font-medium">
+          <h2 className="text-white/90 text-base md:text-lg lg:text-xl font-medium px-4 md:px-8 lg:px-0">
             Practice language learning with the shadowing technique
           </h2>
         </header>

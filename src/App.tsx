@@ -1,23 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Category, Phrase, ShadowingSettings, VoiceSettings, TranslationLanguage } from './types';
 import CategorySelector from './components/CategorySelector';
 import PhraseList from './components/PhraseList';
 import ShadowingPlayer from './components/ShadowingPlayer';
 import SettingsPage from './components/SettingsPage';
+import TextPasteForm from './components/TextPasteForm';
 import { mockPhrases } from './data/mockPhrases';
 import { generatePhrase } from './utils/aiPhraseGenerator';
-import { Upload, Settings } from 'lucide-react';
+import { Upload, Settings, ArrowLeft } from 'lucide-react';
 import mammoth from 'mammoth';
+import { urlSlugToCategory, categoryToUrlSlug } from './utils/urlMapping';
+import { getCategoryLabel } from './utils/categoryLabels';
 
 type View = 'main' | 'settings';
 
 function App() {
+  const params = useParams<{ category?: string }>();
+  const location = useLocation();
+  const { category: categoryParam } = params;
+  const navigate = useNavigate();
+  
+  // Debug: Extract category from URL pathname as fallback
+  const pathnameCategory = location.pathname.slice(1); // Remove leading '/'
+  const actualCategoryParam = categoryParam || (pathnameCategory && pathnameCategory !== '' ? pathnameCategory : undefined);
+  
+  console.log('App render - location:', location.pathname, 'params:', params, 'categoryParam:', categoryParam, 'actualCategoryParam:', actualCategoryParam);
+  
   const [currentView, setCurrentView] = useState<View>('main');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [selectedPhrase, setSelectedPhrase] = useState<Phrase | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [uploadTab, setUploadTab] = useState<'file' | 'paste'>('file');
+  const [uploadSectionOpen, setUploadSectionOpen] = useState(false);
   
   const [shadowingSettings, setShadowingSettings] = useState<ShadowingSettings>({
     repetitions: 3,
@@ -32,10 +50,67 @@ function App() {
 
   const [translationLanguage, setTranslationLanguage] = useState<TranslationLanguage>('el');
 
+  // Update meta tags dynamically based on category
+  useEffect(() => {
+    if (selectedCategory) {
+      const categoryLabel = getCategoryLabel(selectedCategory);
+      const title = `${categoryLabel} Shadowing English | Shadow Fluent`;
+      const description = `Master ${categoryLabel} with our English shadowing tool. Practice with natural voices, set custom pauses, and improve your fluency. Start shadowing ${categoryLabel} today!`;
+      
+      // Update document title
+      document.title = title;
+      
+      // Update meta description
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.setAttribute('name', 'description');
+        document.head.appendChild(metaDescription);
+      }
+      metaDescription.setAttribute('content', description);
+    } else {
+      // Home page meta tags
+      document.title = 'Shadowing English | Speaking Practice | Shadow Fluent';
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', 'Master English speaking with ShadowFluent. Practice the shadowing method with different voices, custom text uploads, and adjustable delays. Start speaking like a native today!');
+      }
+    }
+  }, [selectedCategory]);
+
+  // Update category when URL changes
+  useEffect(() => {
+    console.log('Category param changed:', actualCategoryParam);
+    if (actualCategoryParam) {
+      const category = urlSlugToCategory(actualCategoryParam);
+      // If not found in mapping, try direct match (for categories that use same slug)
+      const finalCategory = category || (Object.keys(mockPhrases).includes(actualCategoryParam) ? actualCategoryParam as Category : null);
+      
+      console.log('URL slug:', actualCategoryParam, '→ Category:', finalCategory);
+      
+      if (finalCategory && Object.keys(mockPhrases).includes(finalCategory)) {
+        console.log('Setting category:', finalCategory, 'Phrases:', mockPhrases[finalCategory].length);
+        setSelectedCategory(finalCategory);
+        setPhrases(mockPhrases[finalCategory]);
+        setSelectedPhrase(null);
+      } else {
+        console.warn('Invalid category:', actualCategoryParam);
+        // Invalid category - clear selection
+        setSelectedCategory(null);
+        setPhrases([]);
+        setSelectedPhrase(null);
+      }
+    } else {
+      console.log('No category param, clearing selection');
+      setSelectedCategory(null);
+      setPhrases([]);
+      setSelectedPhrase(null);
+    }
+  }, [location.pathname, actualCategoryParam]);
+
   const handleCategorySelect = (category: Category) => {
-    setSelectedCategory(category);
-    setPhrases(mockPhrases[category]);
-    setSelectedPhrase(null);
+    const urlSlug = categoryToUrlSlug(category);
+    navigate(`/${urlSlug}`);
   };
 
   const handleGeneratePhrase = async () => {
@@ -190,6 +265,39 @@ function App() {
     setPhrases(shuffled);
   };
 
+  const handleTextSubmit = (text: string) => {
+    if (!text || text.trim().length === 0) {
+      alert('Please enter some phrases');
+      return;
+    }
+
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length === 0) {
+      alert('No phrases found. Please enter at least one phrase (one per line).');
+      return;
+    }
+
+    const timestamp = Date.now();
+    const newPhrases: Phrase[] = lines.map((line, index) => ({
+      id: `upload-${timestamp}-${index}`,
+      text: line.trim(),
+      category: selectedCategory || 'business',
+      source: 'uploaded',
+      isFavorite: false,
+    }));
+
+    // Add uploaded phrases to the beginning of the list so they're visible
+    setPhrases((prev) => [...newPhrases, ...prev]);
+    if (newPhrases.length > 0) {
+      setSelectedPhrase(newPhrases[0]);
+      console.log(`✅ Added ${newPhrases.length} phrases from text`);
+      
+      // Show success message
+      alert(`✅ Successfully added ${newPhrases.length} phrases!\n\nThe phrases appear at the beginning of the list.`);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -307,7 +415,12 @@ function App() {
     );
   }
 
-  return (
+  // Main content component
+  const MainContent = () => {
+    // Debug: Check if selectedCategory is set
+    console.log('MainContent render - selectedCategory:', selectedCategory, 'phrases:', phrases.length);
+    
+    return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <header className="text-center mb-8 relative pt-20 md:pt-16 lg:pt-12">
@@ -344,61 +457,130 @@ function App() {
           
           {/* Main Heading - Center, single line */}
           <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 px-4 md:px-8 lg:px-0">
-            English Shadowing App for Fluency
+            {selectedCategory 
+              ? `${getCategoryLabel(selectedCategory)} Shadowing English`
+              : 'Shadowing English App for Fluency'
+            }
           </h1>
           
           {/* Subtitle */}
           <h2 className="text-white/90 text-base md:text-lg lg:text-xl font-medium px-4 md:px-8 lg:px-0">
-            Practice language learning with the shadowing technique
+            {selectedCategory 
+              ? `Practice ${getCategoryLabel(selectedCategory)} with the shadowing technique`
+              : 'Practice language learning with the shadowing technique'
+            }
           </h2>
         </header>
 
         <div className="space-y-6">
-          {/* Category Selection */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">
-              Select Category
-            </h2>
-            <CategorySelector
-              selectedCategory={selectedCategory}
-              onSelectCategory={handleCategorySelect}
-            />
-          </div>
+          {/* Back Button - Only show when category is selected */}
+          {selectedCategory && (
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back to Categories</span>
+              </button>
+            </div>
+          )}
 
-          {/* File Upload - Discreet */}
+          {/* Category Selection - Only show when no category is selected */}
+          {!selectedCategory && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">
+                Select Category
+              </h2>
+              <CategorySelector
+                selectedCategory={selectedCategory}
+                onSelectCategory={handleCategorySelect}
+              />
+            </div>
+          )}
+
+          {/* File Upload and Text Paste - Discreet */}
           <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-              <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer text-white/90 hover:text-white transition-colors text-sm font-semibold">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span className="text-xs md:text-sm">Upload Your Own Phrases (Optional)</span>
-                </summary>
+              <button
+                onClick={() => setUploadSectionOpen(!uploadSectionOpen)}
+                className="w-full flex items-center gap-2 cursor-pointer text-white/90 hover:text-white transition-colors text-sm font-semibold mb-0"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span className="text-xs md:text-sm">Upload Your Own Phrases (Optional)</span>
+                <span className="ml-auto text-xs">
+                  {uploadSectionOpen ? '▼' : '▶'}
+                </span>
+              </button>
                 
-                <div className="mt-3 space-y-2">
-                  <label className="flex flex-col items-center justify-center w-full h-16 border border-dashed border-white/30 rounded-lg cursor-pointer bg-white/5 hover:bg-white/10 transition-colors">
-                    <div className="flex flex-col items-center justify-center">
-                      <Upload className="w-4 h-4 mb-1 text-white/80" />
-                      <p className="text-xs text-white/85 font-semibold">
-                        <span className="font-bold">Click to upload</span> or drag file here
-                      </p>
-                      <p className="text-xs text-white/70 font-medium">.txt or .docx files</p>
+                {uploadSectionOpen && (
+                <div className="mt-3 space-y-3">
+                  {/* Tabs for File Upload vs Paste Text */}
+                  <div className="flex gap-2 border-b border-white/10 pb-2">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setUploadTab('file');
+                      }}
+                      className={`px-3 py-1 text-xs font-semibold transition-colors ${
+                        uploadTab === 'file'
+                          ? 'border-b-2 border-white/40 text-white'
+                          : 'text-white/70 hover:text-white/90'
+                      }`}
+                    >
+                      📁 Upload File
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setUploadTab('paste');
+                      }}
+                      className={`px-3 py-1 text-xs font-semibold transition-colors ${
+                        uploadTab === 'paste'
+                          ? 'border-b-2 border-white/40 text-white'
+                          : 'text-white/70 hover:text-white/90'
+                      }`}
+                    >
+                      📝 Paste Text
+                    </button>
+                  </div>
+
+                  {/* File Upload Tab */}
+                  {uploadTab === 'file' && (
+                    <div className="space-y-2">
+                      <label className="flex flex-col items-center justify-center w-full h-16 border border-dashed border-white/30 rounded-lg cursor-pointer bg-white/5 hover:bg-white/10 transition-colors">
+                        <div className="flex flex-col items-center justify-center">
+                          <Upload className="w-4 h-4 mb-1 text-white/80" />
+                          <p className="text-xs text-white/90 font-bold">
+                            <span className="font-bold">Click to upload</span> or drag file here
+                          </p>
+                          <p className="text-xs text-white/80 font-semibold">.txt or .docx files</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".txt,.docx,.doc"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
-                    <input
-                      type="file"
-                      accept=".txt,.docx,.doc"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
+                  )}
+
+                  {/* Paste Text Tab */}
+                  {uploadTab === 'paste' && (
+                    <div className="space-y-2">
+                      <TextPasteForm onSubmit={handleTextSubmit} />
+                    </div>
+                  )}
                   
-                  <div className="p-2 bg-white/5 border border-white/10 rounded text-xs text-white/75">
-                    <p className="font-semibold mb-1">📋 Format:</p>
-                    <ul className="space-y-0.5 list-disc list-inside text-xs font-medium">
+                  <div className="p-2 bg-white/5 border border-white/10 rounded text-xs text-white/85">
+                    <p className="font-bold mb-1">📋 Format:</p>
+                    <ul className="space-y-0.5 list-disc list-inside text-xs font-semibold">
                       <li>Each line = one phrase</li>
-                      <li>Supports .txt and .docx files</li>
+                      <li>Supports .txt and .docx files, or paste text directly</li>
                     </ul>
                   </div>
                 </div>
-              </details>
+                )}
           </div>
 
           {/* Main Content */}
@@ -416,6 +598,8 @@ function App() {
                 onShuffle={handleShuffle}
                 isLoading={isGenerating}
                 translationLanguage={translationLanguage}
+                showFavoritesOnly={showFavoritesOnly}
+                onShowFavoritesOnlyChange={setShowFavoritesOnly}
               />
 
               {/* Shadowing Player */}
@@ -430,18 +614,35 @@ function App() {
                     console.log('Session completed');
                   }}
                   onNextPhrase={() => {
-                    // Find current phrase index
-                    const currentIndex = phrases.findIndex(p => p.id === selectedPhrase.id);
-                    if (currentIndex >= 0 && currentIndex < phrases.length - 1) {
-                      // Move to next phrase and auto-start
-                      const nextPhrase = phrases[currentIndex + 1];
-                      setSelectedPhrase(nextPhrase);
-                      // The ShadowingPlayer will detect the phrase change and auto-start
-                    }
+                    // Add a small delay to prevent flicker during phrase transition
+                    // This keeps the fullscreen active while switching phrases
+                    setTimeout(() => {
+                      // Use filtered phrases based on showFavoritesOnly
+                      const filteredPhrases = showFavoritesOnly 
+                        ? phrases.filter(p => p.isFavorite)
+                        : phrases;
+                      
+                      // Find current phrase index in filtered list
+                      const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
+                      if (currentIndex >= 0 && currentIndex < filteredPhrases.length - 1) {
+                        // Move to next phrase and auto-start
+                        const nextPhrase = filteredPhrases[currentIndex + 1];
+                        setSelectedPhrase(nextPhrase);
+                        // The ShadowingPlayer will detect the phrase change and auto-start
+                      }
+                    }, 200); // Small delay to prevent flicker
                   }}
-                  hasNextPhrase={
-                    phrases.findIndex(p => p.id === selectedPhrase.id) < phrases.length - 1
-                  }
+                  hasNextPhrase={(() => {
+                    // Use filtered phrases based on showFavoritesOnly
+                    const filteredPhrases = showFavoritesOnly 
+                      ? phrases.filter(p => p.isFavorite)
+                      : phrases;
+                    
+                    const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
+                    const hasNext = currentIndex >= 0 && currentIndex < filteredPhrases.length - 1;
+                    console.log('hasNextPhrase check - currentIndex:', currentIndex, 'filteredPhrases.length:', filteredPhrases.length, 'hasNext:', hasNext, 'showFavoritesOnly:', showFavoritesOnly);
+                    return hasNext;
+                  })()}
                 />
               ) : (
                 <div className="bg-white rounded-xl shadow-lg p-8 flex items-center justify-center min-h-[400px]">
@@ -463,6 +664,14 @@ function App() {
         </footer>
       </div>
     </div>
+    );
+  };
+
+  return (
+    <Routes>
+      <Route path="/" element={<MainContent />} />
+      <Route path="/:category" element={<MainContent />} />
+    </Routes>
   );
 }
 

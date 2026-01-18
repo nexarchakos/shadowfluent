@@ -14,6 +14,8 @@ interface PhraseListProps {
   isLoading: boolean;
   isGeneratingBatch?: boolean;
   translationLanguage?: TranslationLanguage;
+  showFavoritesOnly?: boolean;
+  onShowFavoritesOnlyChange?: (value: boolean) => void;
 }
 
 export default function PhraseList({
@@ -27,9 +29,14 @@ export default function PhraseList({
   isLoading,
   isGeneratingBatch = false,
   translationLanguage = 'el',
+  showFavoritesOnly: showFavoritesOnlyProp,
+  onShowFavoritesOnlyChange,
 }: PhraseListProps) {
   const [translations, setTranslations] = useState<Record<string, string>>({});
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  // Use controlled or uncontrolled state for showFavoritesOnly
+  const [internalShowFavoritesOnly, setInternalShowFavoritesOnly] = useState(false);
+  const showFavoritesOnly = showFavoritesOnlyProp !== undefined ? showFavoritesOnlyProp : internalShowFavoritesOnly;
+  const setShowFavoritesOnly = onShowFavoritesOnlyChange || setInternalShowFavoritesOnly;
 
   // Separate phrases by source (memoized for performance)
   const standardPhrases = useMemo(() => phrases.filter(p => p.source === 'standard'), [phrases]);

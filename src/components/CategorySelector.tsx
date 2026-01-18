@@ -1,4 +1,6 @@
+import { Link, useLocation } from 'react-router-dom';
 import { Category } from '../types';
+import { categoryToUrlSlug } from '../utils/urlMapping';
 import { 
   Briefcase, 
   Plane, 
@@ -22,7 +24,7 @@ import {
 
 interface CategorySelectorProps {
   selectedCategory: Category | null;
-  onSelectCategory: (category: Category) => void;
+  onSelectCategory?: (category: Category) => void;
 }
 
 const categories: { id: Category; label: string; icon: React.ReactNode }[] = [
@@ -47,28 +49,35 @@ const categories: { id: Category; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function CategorySelector({ selectedCategory, onSelectCategory }: CategorySelectorProps) {
+  const location = useLocation();
+  const activeCategory = selectedCategory;
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-      {categories.map((category) => (
-        <button
-          key={category.id}
-          onClick={() => onSelectCategory(category.id)}
-          className={`
-            p-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95
-            ${selectedCategory === category.id
-              ? 'bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-xl ring-2 ring-primary-300 ring-offset-2'
-              : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-primary-50 hover:to-primary-100 shadow-md hover:shadow-lg'
-            }
-          `}
-        >
-          <div className="flex flex-col items-center gap-3">
-            <div className={selectedCategory === category.id ? 'scale-110' : ''}>
-              {category.icon}
+      {categories.map((category) => {
+        const isActive = activeCategory === category.id;
+        const urlSlug = categoryToUrlSlug(category.id);
+        return (
+          <Link
+            key={category.id}
+            to={`/${urlSlug}`}
+            className={`
+              p-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 block
+              ${isActive
+                ? 'bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-xl ring-2 ring-primary-300 ring-offset-2'
+                : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-primary-50 hover:to-primary-100 shadow-md hover:shadow-lg'
+              }
+            `}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className={isActive ? 'scale-110' : ''}>
+                {category.icon}
+              </div>
+              <span className="font-semibold text-sm">{category.label}</span>
             </div>
-            <span className="font-semibold text-sm">{category.label}</span>
-          </div>
-        </button>
-      ))}
+          </Link>
+        );
+      })}
     </div>
   );
 }

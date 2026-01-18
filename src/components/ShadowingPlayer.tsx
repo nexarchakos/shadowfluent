@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Phrase, ShadowingSettings, VoiceSettings, TranslationLanguage } from '../types';
 import { Play, Pause, RotateCcw, ArrowLeft } from 'lucide-react';
 import { ttsService } from '../utils/tts';
@@ -23,12 +23,14 @@ export default function ShadowingPlayer({
   onNextPhrase,
   hasNextPhrase = false,
 }: ShadowingPlayerProps) {
+  console.log('ShadowingPlayer render - phrase.id:', phrase.id, 'phrase.text:', phrase.text.substring(0, 50));
   const [currentRepetition, setCurrentRepetition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [autoStartNext, setAutoStartNext] = useState(false);
+  const isFullscreenRef = useRef(false); // Track fullscreen state to prevent flicker
   const [translatedText, setTranslatedText] = useState<string | undefined>(phrase.translation);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(false); // Prevent infinite loops
@@ -39,6 +41,23 @@ export default function ShadowingPlayer({
   const wasSpeakingRef = useRef(false); // Track if we were in the middle of speaking when paused
   const pausedCountdownRef = useRef<number | null>(null); // Track countdown value when paused
   const lastCompletedRepetitionRef = useRef<number | null>(null); // Track the last completed repetition (0-based)
+  const autoStartNextRef = useRef(false); // Track if we should auto-start next phrase (for race condition prevention)
+  const isFinalCountdownRef = useRef(false); // Track if we're in the final countdown (after all repetitions)
+  
+  // Helper to check if auto-start flag is set (works across re-mounts using sessionStorage as backup)
+  const checkAutoStartFlag = () => {
+    return autoStartNextRef.current || sessionStorage.getItem('shadowing_autoStartNext') === 'true';
+  };
+  
+  // Helper to set auto-start flag (persists across re-mounts)
+  const setAutoStartFlag = (value: boolean) => {
+    autoStartNextRef.current = value;
+    if (value) {
+      sessionStorage.setItem('shadowing_autoStartNext', 'true');
+    } else {
+      sessionStorage.removeItem('shadowing_autoStartNext');
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -64,15 +83,50 @@ export default function ShadowingPlayer({
 
   // Reset when phrase changes (unless it's auto-advance)
   useEffect(() => {
+    console.log('useEffect triggered - phrase.id:', phrase.id, 'previousPhraseId.current:', previousPhraseId.current, 'autoStartNext:', autoStartNext, 'autoStartNextRef.current:', autoStartNextRef.current);
+    
     // Only run if phrase actually changed
     if (previousPhraseId.current === null) {
+      // First time - but check if this is an auto-advance scenario
+      const shouldAutoStart = autoStartNext || checkAutoStartFlag();
+      if (shouldAutoStart) {
+        console.log('First time but autoStartNext is true - this is auto-advance, starting phrase');
+        previousPhraseId.current = phrase.id;
+        setCurrentRepetition(1);
+        setCountdown(null);
+        setIsPlaying(true);
+        setIsPaused(false);
+        setIsFullscreen(true);
+        setAutoStartNext(false);
+        // Don't clear autoStartFlag yet - we'll clear it after playPhrase starts
+        // Set isPlayingRef immediately before setTimeout to ensure it's true
+        isPlayingRef.current = true;
+        setTimeout(() => {
+          console.log('Auto-starting playPhrase(0) for new phrase (first time), isPlayingRef.current:', isPlayingRef.current);
+          // Ensure isPlayingRef is still true before calling playPhrase (may have been reset by cleanup)
+          if (!isPlayingRef.current) {
+            console.warn('isPlayingRef was reset, setting it to true again');
+            isPlayingRef.current = true;
+            setIsPlaying(true);
+          }
+          // Now clear the flag after we're sure playPhrase will start
+          setAutoStartFlag(false);
+          playPhrase(0);
+        }, 300);
+        return;
+      }
       // First time - just set the ID, don't reset anything
+      console.log('First time - setting previousPhraseId to:', phrase.id);
       previousPhraseId.current = phrase.id;
       return;
     }
 
     if (phrase.id !== previousPhraseId.current) {
-      if (autoStartNext) {
+      const shouldAutoStart = autoStartNext || checkAutoStartFlag();
+      console.log('Phrase changed detected - phrase.id:', phrase.id, 'previousPhraseId:', previousPhraseId.current, 'autoStartNext:', autoStartNext, 'shouldAutoStart:', shouldAutoStart);
+      // Check both state and ref/sessionStorage to handle race conditions
+      if (shouldAutoStart) {
+        console.log('Auto-advance detected, starting next phrase');
         // This is an auto-advance scenario - keep playing and fullscreen
         previousPhraseId.current = phrase.id;
         // Reset repetition counter but keep fullscreen and playing state
@@ -83,8 +137,10 @@ export default function ShadowingPlayer({
         isPlayingRef.current = true;
         setIsFullscreen(true); // Keep fullscreen for smooth transition
         setAutoStartNext(false);
+        setAutoStartFlag(false); // Clear flag including sessionStorage
         // Small delay for smooth transition
         setTimeout(() => {
+          console.log('Auto-starting playPhrase(0) for new phrase');
           playPhrase(0); // Still pass 0 internally for logic
         }, 300);
       } else {
@@ -115,6 +171,7 @@ export default function ShadowingPlayer({
     pausedRepetitionRef.current = null;
     pausedCountdownRef.current = null;
     lastCompletedRepetitionRef.current = null;
+    isFinalCountdownRef.current = false;
     setIsPlaying(true);
     setIsPaused(false);
     setCurrentRepetition(1); // Start at 1, not 0
@@ -124,8 +181,12 @@ export default function ShadowingPlayer({
   };
 
   const playPhrase = async (repetitionNumber: number) => {
+    console.log('playPhrase called - repetitionNumber:', repetitionNumber, 'isPlayingRef.current:', isPlayingRef.current, 'settings.repetitions:', settings.repetitions);
     // Safety check to prevent infinite loops
+    // Note: repetitionNumber is 0-based, so if repetitions=3, valid numbers are 0, 1, 2
+    // We should stop if repetitionNumber >= settings.repetitions (e.g., if 3 >= 3)
     if (!isPlayingRef.current || repetitionNumber >= settings.repetitions) {
+      console.warn('playPhrase stopped - isPlayingRef:', isPlayingRef.current, 'repetitionNumber:', repetitionNumber, '>= settings.repetitions:', settings.repetitions);
       setIsPlaying(false);
       setCountdown(null);
       isPlayingRef.current = false;
@@ -181,45 +242,59 @@ export default function ShadowingPlayer({
         }, 1000);
       } else {
         // All repetitions completed for this phrase
-        // Show countdown one last time before advancing to next phrase
-        if (hasNextPhrase && onNextPhrase && isPlayingRef.current) {
-          let remaining = settings.intervalSeconds;
+        // Show countdown one last time before advancing to next phrase (or finishing)
+        console.log('All repetitions completed. hasNextPhrase:', hasNextPhrase, 'onNextPhrase:', !!onNextPhrase, 'isPlayingRef:', isPlayingRef.current);
+        
+        // Mark this as final countdown
+        isFinalCountdownRef.current = true;
+        
+        // Always show countdown (even for last phrase)
+        let remaining = settings.intervalSeconds;
+        setCountdown(remaining);
+
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        countdownRef.current = setInterval(() => {
+          // Check if paused - if so, stop the countdown
+          // Use ONLY refs to avoid race conditions
+          if (isPausedRef.current || !isPlayingRef.current) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            return;
+          }
+          remaining -= 1;
           setCountdown(remaining);
 
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          countdownRef.current = setInterval(() => {
-            // Check if paused - if so, stop the countdown
-            // Use ONLY refs to avoid race conditions
-            if (isPausedRef.current || !isPlayingRef.current) {
-              if (countdownRef.current) clearInterval(countdownRef.current);
-              return;
-            }
-            remaining -= 1;
-            setCountdown(remaining);
-
-            if (remaining <= 0) {
-              if (countdownRef.current) clearInterval(countdownRef.current);
-              setCountdown(null);
-              // Set flag to auto-start next phrase
-              if (isPlayingRef.current && !isPausedRef.current) {
-                setAutoStartNext(true);
-                // Keep fullscreen open for smooth transition
-                setTimeout(() => {
-                  if (onNextPhrase) {
-                    onNextPhrase();
-                  }
-                }, 300);
+          if (remaining <= 0) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            setCountdown(null);
+            
+            // Clear final countdown flag
+            isFinalCountdownRef.current = false;
+            
+            // Check if there's a next phrase
+            console.log('Final countdown check - hasNextPhrase:', hasNextPhrase, 'onNextPhrase:', !!onNextPhrase, 'isPlayingRef.current:', isPlayingRef.current, 'isPausedRef.current:', isPausedRef.current);
+            if (hasNextPhrase && onNextPhrase && isPlayingRef.current && !isPausedRef.current) {
+              console.log('Final countdown completed, setting autoStartNext and calling onNextPhrase');
+              // Set both state and ref/sessionStorage flag to ensure auto-start works even with race conditions and re-mounts
+              // IMPORTANT: Set flag FIRST, synchronously, before calling onNextPhrase
+              setAutoStartFlag(true); // Set ref and sessionStorage immediately (synchronous) - this must happen first!
+              setAutoStartNext(true);
+              // Keep fullscreen open for smooth transition
+              // Call onNextPhrase synchronously after setting the ref
+              // The ref will be checked in useEffect when phrase changes
+              if (onNextPhrase) {
+                console.log('Calling onNextPhrase callback immediately, autoStartNextRef.current:', autoStartNextRef.current);
+                onNextPhrase();
               }
+            } else {
+              // No more phrases or playback stopped - close fullscreen
+              console.log('No more phrases or playback stopped, closing fullscreen');
+              setIsPlaying(false);
+              isPlayingRef.current = false;
+              setIsFullscreen(false);
+              onComplete();
             }
-          }, 1000);
-        } else {
-          // No more phrases, close fullscreen
-          setCountdown(null);
-          setIsPlaying(false);
-          isPlayingRef.current = false;
-          setIsFullscreen(false);
-          onComplete();
-        }
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error('Error playing phrase:', error);
@@ -303,21 +378,64 @@ export default function ShadowingPlayer({
         remaining -= 1;
         setCountdown(remaining);
 
-        if (remaining <= 0) {
+          if (remaining <= 0) {
           if (countdownRef.current) clearInterval(countdownRef.current);
           setCountdown(null);
+          
+          // Clear final countdown flag if it was set
+          const wasFinalCountdown = isFinalCountdownRef.current;
+          if (wasFinalCountdown) {
+            isFinalCountdownRef.current = false;
+          }
+          
           if (isPlayingRef.current && !isPausedRef.current) {
-            // Countdown finished - move to NEXT repetition (not the same one)
-            // pausedRepetitionRef.current is the repetition we just finished when paused
-            // We want to move to the next one
-            const nextRepetition = pausedRepetitionRef.current !== null 
-              ? pausedRepetitionRef.current + 1  // Move to next repetition
-              : currentRepetition; // Fallback: use current (already 0-based)
-            // Clear pause tracking before playing
-            pausedDuringSpeechRef.current = false;
-            wasSpeakingRef.current = false;
-            pausedCountdownRef.current = null;
-            playPhrase(nextRepetition);
+            // Check if this is the final countdown (after all repetitions)
+            if (wasFinalCountdown) {
+              // This is the final countdown - handle onNextPhrase/onComplete
+              console.log('Resumed final countdown completed - handling onNextPhrase/onComplete');
+              // Clear pause tracking
+              pausedDuringSpeechRef.current = false;
+              wasSpeakingRef.current = false;
+              pausedCountdownRef.current = null;
+              
+              // Use the same logic as the normal final countdown
+              if (hasNextPhrase && onNextPhrase) {
+                console.log('Final countdown completed (resumed), setting autoStartNext and calling onNextPhrase');
+                setAutoStartFlag(true);
+                setAutoStartNext(true);
+                if (onNextPhrase) {
+                  console.log('Calling onNextPhrase callback immediately, autoStartNextRef.current:', autoStartNextRef.current);
+                  onNextPhrase();
+                }
+              } else {
+                console.log('No more phrases (resumed), closing fullscreen');
+                setIsPlaying(false);
+                isPlayingRef.current = false;
+                setIsFullscreen(false);
+                onComplete();
+              }
+            } else {
+              // This is a countdown between repetitions - move to next repetition
+              const nextRepetition = pausedRepetitionRef.current !== null 
+                ? pausedRepetitionRef.current + 1  // Move to next repetition
+                : currentRepetition; // Fallback: use current (already 0-based)
+              
+              // Check if we've completed all repetitions
+              if (nextRepetition < settings.repetitions) {
+                // Clear pause tracking before playing
+                pausedDuringSpeechRef.current = false;
+                wasSpeakingRef.current = false;
+                pausedCountdownRef.current = null;
+                playPhrase(nextRepetition);
+              } else {
+                // This shouldn't happen - if we're not in final countdown, we shouldn't reach here
+                // But handle it gracefully
+                console.warn('Resumed countdown but nextRepetition >= repetitions - this should not happen');
+                pausedDuringSpeechRef.current = false;
+                wasSpeakingRef.current = false;
+                pausedCountdownRef.current = null;
+              }
+            }
           }
         }
       }, 1000);
@@ -347,6 +465,7 @@ export default function ShadowingPlayer({
     pausedRepetitionRef.current = null;
     pausedCountdownRef.current = null;
     lastCompletedRepetitionRef.current = null;
+    isFinalCountdownRef.current = false;
     setIsPlaying(false);
     setIsPaused(false);
     setCurrentRepetition(0); // Reset to 0 (will show 0 until start)
@@ -358,7 +477,15 @@ export default function ShadowingPlayer({
 
   // Fullscreen component - TRUE fullscreen
   // Show fullscreen when playing or paused (not just when phrase is selected)
-  if (isFullscreen && (isPlaying || isPaused)) {
+  // Also show fullscreen if autoStartNext is active (to prevent flicker during phrase transition)
+  const shouldShowFullscreen = (isFullscreen || checkAutoStartFlag()) && (isPlaying || isPaused || checkAutoStartFlag());
+  
+  // Sync ref with state
+  if (isFullscreen) {
+    isFullscreenRef.current = true;
+  }
+  
+  if (shouldShowFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
         <div className="w-full h-full flex flex-col items-center justify-center p-4 md:p-8 relative">
@@ -377,7 +504,7 @@ export default function ShadowingPlayer({
           {/* Fixed text area - CENTER, ABSOLUTE POSITION, never moves */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[50%] text-center max-w-5xl w-full px-4 md:px-8 pb-32 md:pb-40">
             <h2 
-              className={`font-bold text-white mb-4 md:mb-6 leading-tight transition-opacity duration-300 ${
+              className={`font-bold text-white mb-4 md:mb-6 leading-tight ${
                 phrase.text.length > 100 
                   ? 'text-4xl md:text-5xl lg:text-6xl' 
                   : phrase.text.length > 60 
@@ -389,7 +516,7 @@ export default function ShadowingPlayer({
             </h2>
             {translatedText && (
               <p 
-                className={`text-white/80 italic transition-opacity duration-300 ${
+                className={`text-white/80 italic ${
                   translatedText.length > 100 
                     ? 'text-xl md:text-2xl lg:text-3xl' 
                     : translatedText.length > 60 

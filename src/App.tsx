@@ -365,40 +365,40 @@ function App() {
             />
           </div>
 
-          {/* File Upload */}
-          <div className="bg-white rounded-xl shadow-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Upload className="w-4 h-4 text-primary-600" />
-                <h3 className="font-semibold text-gray-800 text-base">
-                  Upload Your Own Phrases File
-                </h3>
-              </div>
-              
-              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-primary-300 rounded-lg cursor-pointer bg-primary-50 hover:bg-primary-100 transition-colors">
-                <div className="flex flex-col items-center justify-center">
-                  <Upload className="w-5 h-5 mb-1 text-primary-600" />
-                  <p className="text-xs text-gray-700">
-                    <span className="font-semibold">Click to upload</span> or drag file here
-                  </p>
-                  <p className="text-xs text-gray-500">.txt or .docx files</p>
+          {/* File Upload - Discreet */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+              <details className="group">
+                <summary className="flex items-center gap-2 cursor-pointer text-white/90 hover:text-white transition-colors text-sm font-semibold">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="text-xs md:text-sm">Upload Your Own Phrases (Optional)</span>
+                </summary>
+                
+                <div className="mt-3 space-y-2">
+                  <label className="flex flex-col items-center justify-center w-full h-16 border border-dashed border-white/30 rounded-lg cursor-pointer bg-white/5 hover:bg-white/10 transition-colors">
+                    <div className="flex flex-col items-center justify-center">
+                      <Upload className="w-4 h-4 mb-1 text-white/80" />
+                      <p className="text-xs text-white/85 font-semibold">
+                        <span className="font-bold">Click to upload</span> or drag file here
+                      </p>
+                      <p className="text-xs text-white/70 font-medium">.txt or .docx files</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".txt,.docx,.doc"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  
+                  <div className="p-2 bg-white/5 border border-white/10 rounded text-xs text-white/75">
+                    <p className="font-semibold mb-1">📋 Format:</p>
+                    <ul className="space-y-0.5 list-disc list-inside text-xs font-medium">
+                      <li>Each line = one phrase</li>
+                      <li>Supports .txt and .docx files</li>
+                    </ul>
+                  </div>
                 </div>
-                <input
-                  type="file"
-                  accept=".txt,.docx,.doc"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-              
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-semibold text-blue-900 mb-1">📋 File Format:</p>
-                <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
-                  <li>Each line = one phrase</li>
-                  <li>Empty lines are ignored</li>
-                  <li>Supports .txt and .docx files</li>
-                  <li>Example: <code className="bg-blue-100 px-1 rounded">Hello, how are you?</code></li>
-                </ul>
-              </div>
+              </details>
           </div>
 
           {/* Main Content */}

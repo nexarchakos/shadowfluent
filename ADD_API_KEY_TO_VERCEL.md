@@ -14,7 +14,7 @@
 1. **Πάτα "Add New"** (top right)
 2. **Συμπλήρωσε:**
    - **Key:** `VITE_OPENAI_API_KEY`
-   - **Value:** `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`
+   - **Value:** `your_openai_api_key_here` (αντίγραψε το API key σου από το `.env` file)
    - **Environment:** Επίλεξε **"Production"** ✅
 3. **Πάτα "Save"**
 

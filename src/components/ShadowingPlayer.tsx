@@ -361,47 +361,63 @@ export default function ShadowingPlayer({
   if (isFullscreen && (isPlaying || isPaused)) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 relative">
+        <div className="w-full h-full flex flex-col items-center justify-center p-4 md:p-8 relative">
           {/* Countdown - TOP of screen, small, doesn't affect text position */}
           {countdown !== null && countdown > 0 && (
-            <div className="absolute top-8 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full">
+            <div className="absolute top-4 md:top-8 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full">
               <div className="text-center">
-                <div className="text-4xl md:text-5xl font-bold text-white/90 mb-1 animate-pulse">
+                <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white/90 mb-1 animate-pulse">
                   {countdown}
                 </div>
-                <p className="text-white/70 text-sm md:text-base">seconds</p>
+                <p className="text-white/70 text-xs md:text-sm lg:text-base">seconds</p>
               </div>
             </div>
           )}
 
           {/* Fixed text area - CENTER, ABSOLUTE POSITION, never moves */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[45%] text-center max-w-5xl w-full px-8 pb-40">
-            <h2 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight transition-opacity duration-300">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[50%] text-center max-w-5xl w-full px-4 md:px-8 pb-32 md:pb-40">
+            <h2 
+              className={`font-bold text-white mb-4 md:mb-6 leading-tight transition-opacity duration-300 ${
+                phrase.text.length > 100 
+                  ? 'text-4xl md:text-5xl lg:text-6xl' 
+                  : phrase.text.length > 60 
+                  ? 'text-5xl md:text-6xl lg:text-7xl' 
+                  : 'text-6xl md:text-7xl lg:text-8xl'
+              }`}
+            >
               {phrase.text}
             </h2>
             {translatedText && (
-              <p className="text-white/80 text-2xl md:text-3xl italic transition-opacity duration-300">
+              <p 
+                className={`text-white/80 italic transition-opacity duration-300 ${
+                  translatedText.length > 100 
+                    ? 'text-xl md:text-2xl lg:text-3xl' 
+                    : translatedText.length > 60 
+                    ? 'text-2xl md:text-3xl lg:text-4xl' 
+                    : 'text-2xl md:text-3xl lg:text-4xl'
+                }`}
+              >
                 {translatedText}
               </p>
             )}
           </div>
 
           {/* Bottom controls - fixed position at bottom with more padding */}
-          <div className="absolute bottom-40 md:bottom-48 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-6 w-full max-w-3xl px-4 z-20">
+          <div className="absolute bottom-24 md:bottom-28 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4 md:gap-6 w-full max-w-3xl px-4 z-20">
             <div className="text-center">
-              <div className="text-5xl md:text-6xl font-bold text-white mb-2">
+              <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-1 md:mb-2">
                 {currentRepetition} / {settings.repetitions}
               </div>
-              <p className="text-white/90 text-xl">Repetitions</p>
+              <p className="text-white/90 text-base md:text-lg lg:text-xl">Repetitions</p>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-3 md:gap-4 flex-wrap justify-center">
               {isPlaying && !isPaused && (
                 <button
                   onClick={pauseSession}
-                  className="flex items-center gap-2 px-8 py-4 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition-colors font-semibold text-lg shadow-lg"
+                  className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition-colors font-semibold text-base md:text-lg shadow-lg"
                 >
-                  <Pause className="w-6 h-6" />
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
                   Pause
                 </button>
               )}
@@ -409,9 +425,9 @@ export default function ShadowingPlayer({
               {isPaused && (
                 <button
                   onClick={resumeSession}
-                  className="flex items-center gap-2 px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors font-semibold text-lg shadow-lg"
+                  className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors font-semibold text-base md:text-lg shadow-lg"
                 >
-                  <Play className="w-6 h-6" />
+                  <Play className="w-5 h-5 md:w-6 md:h-6" />
                   Resume
                 </button>
               )}
@@ -419,9 +435,9 @@ export default function ShadowingPlayer({
               {(isPlaying || isPaused) && (
                 <button
                   onClick={resetSession}
-                  className="flex items-center gap-2 px-8 py-4 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-colors font-semibold text-lg shadow-lg"
+                  className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-colors font-semibold text-base md:text-lg shadow-lg"
                 >
-                  <ArrowLeft className="w-6 h-6" />
+                  <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
                   Back
                 </button>
               )}

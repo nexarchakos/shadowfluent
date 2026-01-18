@@ -466,7 +466,7 @@ function App() {
           {/* Subtitle */}
           <h2 className="text-white/90 text-base md:text-lg lg:text-xl font-medium px-4 md:px-8 lg:px-0">
             {selectedCategory 
-              ? `Practice ${getCategoryLabel(selectedCategory)} with the shadowing technique`
+              ? `Practice ${getCategoryLabel(selectedCategory)} Phrases with the Shadowing Technique`
               : 'Practice language learning with the shadowing technique'
             }
           </h2>
@@ -478,7 +478,7 @@ function App() {
             <div className="flex items-center">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back to Categories</span>
@@ -499,11 +499,12 @@ function App() {
             </div>
           )}
 
-          {/* File Upload and Text Paste - Discreet */}
+          {/* File Upload and Text Paste - Only show when category is selected */}
+          {selectedCategory && (
           <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
               <button
                 onClick={() => setUploadSectionOpen(!uploadSectionOpen)}
-                className="w-full flex items-center gap-2 cursor-pointer text-white/90 hover:text-white transition-colors text-sm font-semibold mb-0"
+                className="w-full flex items-center gap-2 cursor-pointer text-white hover:text-white transition-colors text-sm font-bold mb-0 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span className="text-xs md:text-sm">Upload Your Own Phrases (Optional)</span>
@@ -582,6 +583,7 @@ function App() {
                 </div>
                 )}
           </div>
+          )}
 
           {/* Main Content */}
           {selectedCategory && (

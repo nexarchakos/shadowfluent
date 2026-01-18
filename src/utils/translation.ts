@@ -13,7 +13,7 @@ const translationCache: Record<string, Record<TranslationLanguage, string>> = {}
 // Simple translation function using MyMemory Translation API (free tier)
 // DISABLED by default to avoid rate limits - use mock translations instead
 // Enable only if you have API key or want to use for non-standard phrases
-async function translateWithAPI(
+async function _translateWithAPI(
   text: string,
   targetLanguage: TranslationLanguage
 ): Promise<string> {

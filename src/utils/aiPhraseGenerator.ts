@@ -264,8 +264,9 @@ Make it completely different from common phrases - be creative but still practic
 
 /**
  * Generates a phrase from fallback data
+ * Note: Currently unused, but kept for potential future use
  */
-function generateFallbackPhrase(category: Category): Phrase {
+function _generateFallbackPhrase(category: Category): Phrase {
   const phrases = fallbackPhrases[category];
   const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
 

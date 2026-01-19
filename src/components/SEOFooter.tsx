@@ -15,7 +15,6 @@ export default function SEOFooter({ category }: SEOFooterProps) {
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
         <div
           className={`seo-content ${isExpanded ? 'expanded' : ''}`}
-          aria-expanded={isExpanded}
         >
           {seoContent.sections.map((section, sectionIndex) => (
             <div key={sectionIndex} className={sectionIndex > 0 ? 'mt-6' : ''}>
@@ -35,6 +34,7 @@ export default function SEOFooter({ category }: SEOFooterProps) {
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="mt-4 text-primary-400 hover:text-primary-300 font-semibold text-sm transition-colors flex items-center gap-2"
+          aria-expanded={isExpanded}
           aria-label={isExpanded ? 'Show less content' : 'Show more content'}
         >
           {isExpanded ? (

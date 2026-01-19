@@ -15,7 +15,7 @@ const categoryDescriptions: Record<Category, string> = {
   shopping: 'English phrases for shopping, returns, asking about discounts, and retail interactions',
   technology: 'English phrases for tech support, software discussions, device troubleshooting, and IT conversations',
   'social-media': 'English phrases for online communication, social media posts, comments, and internet interactions',
-  weather: 'English phrases for describing weather conditions, forecasts, and weather-related conversations',
+  questions: 'common English questions for everyday conversations, asking about experiences, opinions, and general inquiries',
   family: 'English phrases for family discussions, relationships, friendships, and personal connections',
   emergency: 'English phrases for emergency situations, asking for help, safety instructions, and urgent communication',
   education: 'English phrases for school, classes, exams, studying, and educational contexts',
@@ -109,12 +109,12 @@ const fallbackPhrases: Record<Category, string[]> = {
     'Let\'s connect on LinkedIn if you\'re interested.',
     'Did you see the latest update on the app?',
   ],
-  weather: [
-    'It looks like it\'s going to rain later this afternoon.',
-    'The weather forecast says it will be sunny tomorrow.',
-    'I love this warm weather we\'ve been having lately.',
-    'It\'s quite chilly outside, you should bring a jacket.',
-    'The temperature is expected to drop significantly tonight.',
+  questions: [
+    'How did it go?',
+    'What did you think of the event?',
+    'Have you ever been to London?',
+    'How long did the performance last?',
+    'What time did you arrive?',
   ],
   family: [
     'How is your family doing these days?',

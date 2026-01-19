@@ -14,7 +14,7 @@ import {
   ShoppingBag, 
   Laptop, 
   Share2, 
-  Cloud, 
+  HelpCircle, 
   UsersRound, 
   AlertTriangle, 
   BookOpen, 
@@ -29,6 +29,7 @@ interface CategorySelectorProps {
 
 const categories: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'business', label: 'Business English', icon: <Briefcase className="w-6 h-6" /> },
+  { id: 'questions', label: 'Questions', icon: <HelpCircle className="w-6 h-6" /> },
   { id: 'travel', label: 'Travel', icon: <Plane className="w-6 h-6" /> },
   { id: 'sport', label: 'Sport', icon: <Trophy className="w-6 h-6" /> },
   { id: 'meetings', label: 'Meetings', icon: <Users className="w-6 h-6" /> },
@@ -40,7 +41,6 @@ const categories: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'shopping', label: 'Shopping', icon: <ShoppingBag className="w-6 h-6" /> },
   { id: 'technology', label: 'Technology', icon: <Laptop className="w-6 h-6" /> },
   { id: 'social-media', label: 'Social Media', icon: <Share2 className="w-6 h-6" /> },
-  { id: 'weather', label: 'Weather', icon: <Cloud className="w-6 h-6" /> },
   { id: 'family', label: 'Family', icon: <UsersRound className="w-6 h-6" /> },
   { id: 'emergency', label: 'Emergency', icon: <AlertTriangle className="w-6 h-6" /> },
   { id: 'education', label: 'Education', icon: <BookOpen className="w-6 h-6" /> },

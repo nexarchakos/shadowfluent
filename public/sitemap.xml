@@ -16,6 +16,14 @@
     <priority>0.9</priority>
   </url>
   
+  <!-- Questions -->
+  <url>
+    <loc>https://www.shadowfluent.com/questions</loc>
+    <lastmod>2025-01-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
   <!-- Travel -->
   <url>
     <loc>https://www.shadowfluent.com/travel</loc>
@@ -99,14 +107,6 @@
   <!-- Social Media -->
   <url>
     <loc>https://www.shadowfluent.com/social-media</loc>
-    <lastmod>2025-01-18</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  
-  <!-- Weather -->
-  <url>
-    <loc>https://www.shadowfluent.com/weather</loc>
     <lastmod>2025-01-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>

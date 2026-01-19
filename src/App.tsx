@@ -55,7 +55,7 @@ function App() {
     if (selectedCategory) {
       const categoryLabel = getCategoryLabel(selectedCategory);
       const title = `${categoryLabel} Shadowing English | Shadow Fluent`;
-      const description = `Master ${categoryLabel} with our English shadowing tool. Practice with natural voices, set custom pauses, and improve your fluency. Start shadowing ${categoryLabel} today!`;
+      const description = `Master ${categoryLabel} with our English Shadowing tool. Practice with natural voices, set custom pauses, and improve your fluency. Start shadowing ${categoryLabel} today!`;
       
       // Update document title
       document.title = title;

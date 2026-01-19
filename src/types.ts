@@ -11,7 +11,7 @@ export type Category =
   | 'shopping'
   | 'technology'
   | 'social-media'
-  | 'weather'
+  | 'questions'
   | 'family'
   | 'emergency'
   | 'education'

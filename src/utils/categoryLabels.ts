@@ -13,7 +13,7 @@ export const categoryLabels: Record<Category, string> = {
   'shopping': 'Shopping',
   'technology': 'Technology',
   'social-media': 'Social Media',
-  'weather': 'Weather',
+  'questions': 'Questions',
   'family': 'Family',
   'emergency': 'Emergency',
   'education': 'Education',

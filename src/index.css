@@ -51,3 +51,33 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* SEO Footer Styles */
+.seo-content {
+  max-height: 120px;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out;
+  position: relative;
+}
+
+.seo-content.expanded {
+  max-height: 2000px;
+}
+
+/* Gradient fade effect when collapsed */
+.seo-content:not(.expanded)::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .seo-content {
+    max-height: 100px;
+  }
+}

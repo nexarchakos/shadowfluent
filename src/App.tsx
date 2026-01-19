@@ -6,6 +6,7 @@ import PhraseList from './components/PhraseList';
 import ShadowingPlayer from './components/ShadowingPlayer';
 import SettingsPage from './components/SettingsPage';
 import TextPasteForm from './components/TextPasteForm';
+import SEOFooter from './components/SEOFooter';
 import { mockPhrases } from './data/mockPhrases';
 import { generatePhrase } from './utils/aiPhraseGenerator';
 import { Upload, Settings, ArrowLeft } from 'lucide-react';
@@ -658,8 +659,11 @@ function App() {
 
         </div>
 
-        {/* Footer */}
-        <footer className="mt-12 py-6 text-center">
+        {/* SEO Footer */}
+        <SEOFooter category={selectedCategory} />
+
+        {/* Copyright Footer */}
+        <footer className="mt-6 py-6 text-center">
           <p className="text-white font-semibold text-sm">
             Crafted with ❤️ by Nicholas Exarchakos
           </p>

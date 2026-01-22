@@ -1,27 +1,4 @@
 import { Category, Phrase } from '../types';
-import OpenAI from 'openai';
-
-// Category descriptions for better AI prompts
-const categoryDescriptions: Record<Category, string> = {
-  business: 'professional business English phrases for workplace communication, meetings, emails, and corporate settings',
-  travel: 'common English phrases for traveling, booking hotels, asking for directions, and tourist situations',
-  sport: 'English phrases related to sports, exercise, competitions, and athletic activities',
-  meetings: 'phrases commonly used in meetings, presentations, and professional discussions',
-  'daily-conversation': 'everyday English phrases for casual conversations, greetings, introductions, and small talk',
-  'job-interview': 'English phrases for job interviews, CV discussions, career questions, and professional interviews',
-  academic: 'academic English phrases for presentations, essays, research discussions, and scholarly communication',
-  medical: 'English phrases for doctor visits, describing symptoms, pharmacy interactions, and healthcare situations',
-  restaurant: 'English phrases for ordering food, restaurant reviews, cooking discussions, and dining experiences',
-  shopping: 'English phrases for shopping, returns, asking about discounts, and retail interactions',
-  technology: 'English phrases for tech support, software discussions, device troubleshooting, and IT conversations',
-  'social-media': 'English phrases for online communication, social media posts, comments, and internet interactions',
-  questions: 'common English questions for everyday conversations, asking about experiences, opinions, and general inquiries',
-  family: 'English phrases for family discussions, relationships, friendships, and personal connections',
-  emergency: 'English phrases for emergency situations, asking for help, safety instructions, and urgent communication',
-  education: 'English phrases for school, classes, exams, studying, and educational contexts',
-  entertainment: 'English phrases for movies, music, books, shows, and entertainment discussions',
-  'health-fitness': 'English phrases for exercise, gym, nutrition, wellness, and fitness activities',
-};
 
 // Fallback phrases if API fails or is not configured
 const fallbackPhrases: Record<Category, string[]> = {
@@ -154,7 +131,7 @@ const fallbackPhrases: Record<Category, string[]> = {
 };
 
 /**
- * Generates a phrase using OpenAI API or falls back to mock data
+ * Generates a phrase using backend API (which calls OpenAI securely)
  * @param category - The category for the phrase
  * @param existingPhrases - Optional array of existing phrases to avoid duplicates
  */
@@ -162,76 +139,55 @@ export async function generatePhrase(
   category: Category,
   existingPhrases: string[] = []
 ): Promise<Phrase> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-
-  // If no API key is configured, use fallback
-  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_openai_api_key_here') {
-    console.log('OpenAI API key not found or not configured, using fallback phrases');
-    throw new Error('OpenAI API key is not configured. Please add your API key to the .env file.');
-  }
-  
-  // Log API key status (first 10 chars only for security)
-  console.log('Using OpenAI API key:', apiKey.substring(0, 10) + '...');
-
   try {
-    const openai = new OpenAI({
-      apiKey: apiKey,
-      dangerouslyAllowBrowser: true, // Only for MVP - in production, use a backend
+    // Call backend API endpoint instead of OpenAI directly
+    const response = await fetch('/api/generate-phrase', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category,
+        existingPhrases,
+        temperature: 1.0,
+      }),
     });
 
-    const systemPrompt = `You are an English language learning assistant. Generate practical, natural English phrases for shadowing practice. 
-The phrases should be:
-- Between 8-20 words long
-- Natural and commonly used in real-life situations
-- Appropriate for intermediate to advanced English learners
-- Clear and easy to pronounce
-- Relevant to the specified category
-- UNIQUE and DIFFERENT from any phrases you've generated before
-
-Return ONLY the phrase, nothing else. No explanations, no quotes, just the phrase.`;
-
-    // Build user prompt with existing phrases to avoid duplicates
-    let userPrompt = `Generate a NEW, UNIQUE English phrase for ${categoryDescriptions[category]}. 
-Make it completely different from common phrases - be creative but still practical.`;
-
-    if (existingPhrases.length > 0) {
-      const examples = existingPhrases.slice(0, 10).join('\n- ');
-      userPrompt += `\n\nIMPORTANT: Do NOT generate any of these existing phrases:\n- ${examples}\n\nGenerate something completely different and unique.`;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `Failed to generate phrase: ${response.statusText}`);
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using cheaper model for MVP
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 1.0, // Maximum temperature for maximum variety
-      max_tokens: 50,
-    });
+    const data = await response.json();
+    const cleanText = data.phrase?.trim();
 
-    const generatedText = completion.choices[0]?.message?.content?.trim();
-
-    if (!generatedText) {
-      throw new Error('No text generated from OpenAI');
+    if (!cleanText) {
+      throw new Error('No phrase generated from API');
     }
-
-    // Clean up the response (remove quotes if present)
-    const cleanText = generatedText.replace(/^["']|["']$/g, '').trim();
 
     // Check if generated phrase already exists
     if (existingPhrases.includes(cleanText)) {
       console.warn('Generated duplicate phrase, retrying...');
-      // Retry once with higher temperature
-      const retryCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt + '\n\nThis is a retry - make sure it\'s completely different.' },
-        ],
-        temperature: 1.2, // Even higher for retry
-        max_tokens: 50,
+      // Retry once
+      const retryResponse = await fetch('/api/generate-phrase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          category,
+          existingPhrases,
+          temperature: 1.2, // Higher temperature for retry
+        }),
       });
-      const retryText = retryCompletion.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, '').trim();
+
+      if (!retryResponse.ok) {
+        throw new Error('Failed to retry phrase generation');
+      }
+
+      const retryData = await retryResponse.json();
+      const retryText = retryData.phrase?.trim();
+      
       if (retryText && !existingPhrases.includes(retryText)) {
         const phrase = {
           id: `ai-${Date.now()}-${Math.random()}`,
@@ -255,9 +211,8 @@ Make it completely different from common phrases - be creative but still practic
     console.log('Generated AI phrase:', phrase);
     return phrase;
   } catch (error) {
-    console.error('Error generating phrase with OpenAI:', error);
+    console.error('Error generating phrase:', error);
     // Don't fallback to standard phrases - throw error so caller can handle it
-    // This ensures we don't mix AI-generated with standard phrases
     throw error;
   }
 }

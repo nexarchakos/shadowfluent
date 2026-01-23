@@ -488,7 +488,7 @@ export default function ShadowingPlayer({
   if (shouldShowFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
-        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-4 md:gap-6 [@media(max-height:500px)]:gap-2 p-4 md:p-8 pb-24 sm:pb-16 md:pb-10 lg:pb-20 xl:pb-24">
+        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-3 sm:gap-4 md:gap-6 [@media(max-height:500px)]:gap-2 p-4 md:p-8 pb-32 sm:pb-16 md:pb-10 lg:pb-20 xl:pb-24">
           {/* Countdown - fixed slot so phrase never shifts */}
           <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] [@media(max-height:500px)]:min-h-[28px] flex flex-col items-center justify-start pt-2 sm:pt-0">
             {countdown !== null && countdown > 0 ? (
@@ -518,10 +518,10 @@ export default function ShadowingPlayer({
               <h2 
                 className={`font-bold text-white mb-4 md:mb-6 leading-tight ${
                   phrase.text.length > 100 
-                    ? 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl' 
+                    ? 'text-2xl sm:text-4xl md:text-5xl lg:text-6xl' 
                     : phrase.text.length > 60 
-                    ? 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl' 
-                    : 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl'
+                    ? 'text-3xl sm:text-5xl md:text-6xl lg:text-7xl' 
+                    : 'text-4xl sm:text-6xl md:text-7xl lg:text-8xl'
                 } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-2xl [@media(max-height:500px)]:mb-1`}
               >
                 {phrase.text}
@@ -530,10 +530,10 @@ export default function ShadowingPlayer({
                 <p 
                   className={`text-white/80 italic ${
                     translatedText.length > 100 
-                      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl' 
+                      ? 'text-base sm:text-xl md:text-2xl lg:text-3xl' 
                       : translatedText.length > 60 
-                      ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl' 
-                      : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
+                      ? 'text-lg sm:text-2xl md:text-3xl lg:text-4xl' 
+                      : 'text-lg sm:text-2xl md:text-3xl lg:text-4xl'
                   } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-sm`}
                 >
                   {translatedText}
@@ -545,10 +545,10 @@ export default function ShadowingPlayer({
           {/* Bottom controls */}
           <div className="flex flex-col items-center gap-4 md:gap-6 [@media(max-height:500px)]:gap-2 w-full max-w-3xl px-4 pb-[env(safe-area-inset-bottom)] mx-auto justify-self-center">
             <div className="text-center">
-              <div className="text-4xl md:text-5xl lg:text-6xl [@media(max-height:500px)]:text-2xl font-bold text-white mb-1 md:mb-2">
+              <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl [@media(max-height:500px)]:text-2xl font-bold text-white mb-1 md:mb-2">
                 {currentRepetition} / {settings.repetitions}
               </div>
-              <p className="text-white/90 text-base md:text-lg lg:text-xl [@media(max-height:500px)]:text-xs">
+              <p className="text-white/90 text-sm sm:text-base md:text-lg lg:text-xl [@media(max-height:500px)]:text-xs">
                 Repetitions
               </p>
             </div>

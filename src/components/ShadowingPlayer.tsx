@@ -490,7 +490,7 @@ export default function ShadowingPlayer({
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
         <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-4 md:gap-6 p-4 md:p-8 pb-16 sm:pb-12 md:pb-10 lg:pb-20 xl:pb-24">
           {/* Countdown - fixed slot so phrase never shifts */}
-          <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] flex flex-col items-center justify-start">
+          <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] flex flex-col items-center justify-start pt-2 sm:pt-0">
             {countdown !== null && countdown > 0 ? (
               <>
                 <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold text-white/90 leading-none animate-pulse">
@@ -518,11 +518,11 @@ export default function ShadowingPlayer({
               <h2 
                 className={`font-bold text-white mb-4 md:mb-6 leading-tight ${
                   phrase.text.length > 100 
-                    ? 'text-4xl md:text-5xl lg:text-6xl' 
+                    ? 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl' 
                     : phrase.text.length > 60 
-                    ? 'text-5xl md:text-6xl lg:text-7xl' 
-                    : 'text-6xl md:text-7xl lg:text-8xl'
-              } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-3xl`}
+                    ? 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl' 
+                    : 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl'
+                } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-3xl [@media(max-height:500px)]:mb-2`}
               >
                 {phrase.text}
               </h2>
@@ -530,11 +530,11 @@ export default function ShadowingPlayer({
                 <p 
                   className={`text-white/80 italic ${
                     translatedText.length > 100 
-                      ? 'text-xl md:text-2xl lg:text-3xl' 
+                      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl' 
                       : translatedText.length > 60 
-                      ? 'text-2xl md:text-3xl lg:text-4xl' 
-                      : 'text-2xl md:text-3xl lg:text-4xl'
-                  } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-lg`}
+                      ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl' 
+                      : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
+                  } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-base`}
                 >
                   {translatedText}
                 </p>
@@ -580,7 +580,7 @@ export default function ShadowingPlayer({
                   className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 [@media(max-height:500px)]:py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-colors font-semibold text-base md:text-lg shadow-lg"
                 >
                   <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
-                  Back
+                  Διακοπή
                 </button>
               )}
             </div>

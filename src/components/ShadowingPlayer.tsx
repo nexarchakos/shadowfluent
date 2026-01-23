@@ -488,10 +488,10 @@ export default function ShadowingPlayer({
   if (shouldShowFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
-        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] gap-4 md:gap-6 p-4 md:p-8 pb-10 md:pb-8">
-          {/* Countdown - small, reserved slot */}
-          <div className="w-full text-center pointer-events-none min-h-[36px] md:min-h-[48px]">
-            {countdown !== null && countdown > 0 && (
+        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-4 md:gap-6 p-4 md:p-8 pb-16 sm:pb-12 md:pb-10 lg:pb-20 xl:pb-24">
+          {/* Countdown - fixed slot so phrase never shifts */}
+          <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] flex flex-col items-center justify-start">
+            {countdown !== null && countdown > 0 ? (
               <>
                 <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold text-white/90 leading-none animate-pulse">
                   {countdown}
@@ -500,6 +500,15 @@ export default function ShadowingPlayer({
                   seconds
                 </p>
               </>
+            ) : (
+              <div className="opacity-0">
+                <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold leading-none">
+                  0
+                </div>
+                <p className="text-xs md:text-sm lg:text-base [@media(max-height:500px)]:text-[11px]">
+                  seconds
+                </p>
+              </div>
             )}
           </div>
 
@@ -534,7 +543,7 @@ export default function ShadowingPlayer({
           </div>
 
           {/* Bottom controls */}
-          <div className="flex flex-col items-center gap-4 md:gap-6 w-full max-w-3xl px-4 pb-[env(safe-area-inset-bottom)]">
+          <div className="flex flex-col items-center gap-4 md:gap-6 w-full max-w-3xl px-4 pb-[env(safe-area-inset-bottom)] mx-auto justify-self-center">
             <div className="text-center">
               <div className="text-4xl md:text-5xl lg:text-6xl [@media(max-height:500px)]:text-3xl font-bold text-white mb-1 md:mb-2">
                 {currentRepetition} / {settings.repetitions}

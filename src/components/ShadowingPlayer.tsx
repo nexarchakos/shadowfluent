@@ -489,17 +489,28 @@ export default function ShadowingPlayer({
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
         <div className="w-full h-full flex flex-col items-center justify-between p-4 md:p-8 gap-4 md:gap-6">
-          {/* Countdown - TOP of screen, small */}
-          {countdown !== null && countdown > 0 && (
-            <div className="w-full text-center pointer-events-none">
-              <div className="text-3xl md:text-4xl lg:text-5xl [@media(max-height:500px)]:text-2xl font-bold text-white/90 mb-1 animate-pulse">
-                {countdown}
+          {/* Countdown - fixed height slot so text never shifts */}
+          <div className="w-full text-center pointer-events-none min-h-[56px] md:min-h-[72px]">
+            {countdown !== null && countdown > 0 ? (
+              <>
+                <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold text-white/90 mb-1 animate-pulse">
+                  {countdown}
+                </div>
+                <p className="text-white/70 text-xs md:text-sm lg:text-base [@media(max-height:500px)]:text-[11px]">
+                  seconds
+                </p>
+              </>
+            ) : (
+              <div className="opacity-0">
+                <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold mb-1">
+                  0
+                </div>
+                <p className="text-xs md:text-sm lg:text-base [@media(max-height:500px)]:text-[11px]">
+                  seconds
+                </p>
               </div>
-              <p className="text-white/70 text-xs md:text-sm lg:text-base [@media(max-height:500px)]:text-[11px]">
-                seconds
-              </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Text area - flex center, scrolls if height is tight */}
           <div className="w-full flex-1 flex items-center justify-center overflow-y-auto px-4 md:px-8">

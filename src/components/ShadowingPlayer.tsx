@@ -488,7 +488,7 @@ export default function ShadowingPlayer({
   if (shouldShowFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
-        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] gap-4 md:gap-6 p-4 md:p-8">
+        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] gap-4 md:gap-6 p-4 md:p-8 pb-10 md:pb-8">
           {/* Countdown - small, reserved slot */}
           <div className="w-full text-center pointer-events-none min-h-[36px] md:min-h-[48px]">
             {countdown !== null && countdown > 0 && (

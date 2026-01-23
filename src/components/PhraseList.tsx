@@ -1,7 +1,7 @@
 import { Phrase, TranslationLanguage } from '../types';
 import { Sparkles, Shuffle, Loader2, Heart, Star } from 'lucide-react';
 import { getPhraseTranslation } from '../utils/translation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 
 interface PhraseListProps {
   phrases: Phrase[];
@@ -33,6 +33,11 @@ export default function PhraseList({
   onShowFavoritesOnlyChange,
 }: PhraseListProps) {
   const [translations, setTranslations] = useState<Record<string, string>>({});
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
+  const [isScrollable, setIsScrollable] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(false);
   // Use controlled or uncontrolled state for showFavoritesOnly
   const [internalShowFavoritesOnly, setInternalShowFavoritesOnly] = useState(false);
   const showFavoritesOnly = showFavoritesOnlyProp !== undefined ? showFavoritesOnlyProp : internalShowFavoritesOnly;
@@ -127,6 +132,25 @@ export default function PhraseList({
     };
   }, [displayedPhrases, translationLanguage]);
 
+  const updateScrollState = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    setIsScrollable(canScroll);
+    setIsAtTop(el.scrollTop <= 1);
+    setIsAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 1);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+  }, [displayedPhrases, translations, updateScrollState]);
+
+  useEffect(() => {
+    const handleResize = () => updateScrollState();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateScrollState]);
+
   const handleGenerateBatch = async () => {
     if (!onGenerateBatch) return;
     await onGenerateBatch(5); // Generate 5 phrases at once
@@ -143,6 +167,28 @@ export default function PhraseList({
       onToggleFavorite(phraseId);
     }
   };
+
+  const handleSelectPhrase = (phrase: Phrase) => {
+    const el = listRef.current;
+    if (el) {
+      lastScrollTopRef.current = el.scrollTop;
+    }
+    onSelectPhrase(phrase);
+    // Restore scroll position after state updates to avoid jump-to-top on mobile.
+    requestAnimationFrame(() => {
+      if (el) el.scrollTop = lastScrollTopRef.current;
+    });
+    setTimeout(() => {
+      if (el) el.scrollTop = lastScrollTopRef.current;
+    }, 0);
+  };
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTop = lastScrollTopRef.current;
+    }
+  }, [selectedPhrase?.id]);
 
   const getBadge = (phrase: Phrase) => {
     // Only show badges for AI-generated and uploaded phrases
@@ -247,7 +293,12 @@ export default function PhraseList({
         </div>
       </div>
 
-      <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+      <div className="relative">
+        <div
+          ref={listRef}
+          onScroll={updateScrollState}
+          className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar"
+        >
         {displayedPhrases.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">
@@ -266,7 +317,9 @@ export default function PhraseList({
             return (
               <button
                 key={phrase.id}
-                onClick={() => onSelectPhrase(phrase)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelectPhrase(phrase)}
+                type="button"
                 className={`
                   w-full text-left p-5 rounded-xl transition-all transform hover:scale-[1.02] duration-200 relative
                   ${selectedPhrase?.id === phrase.id
@@ -317,6 +370,18 @@ export default function PhraseList({
               </button>
             );
           })
+        )}
+        </div>
+        {isScrollable && (
+          <div className="pointer-events-none absolute right-1 top-2 bottom-2 w-1 rounded-full bg-gray-200/80 sm:hidden" />
+        )}
+        {isScrollable && !isAtTop && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-white to-transparent" />
+        )}
+        {isScrollable && !isAtBottom && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent flex items-end justify-center pb-2 sm:hidden">
+            <span className="text-[11px] font-medium text-gray-600">Scroll for more phrases</span>
+          </div>
         )}
       </div>
     </div>

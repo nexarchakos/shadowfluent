@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Phrase, ShadowingSettings, VoiceSettings, TranslationLanguage } from '../types';
-import { Play, Pause, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Play, Pause, RotateCcw, ArrowLeft, Square } from 'lucide-react';
 import { ttsService } from '../utils/tts';
 import { getPhraseTranslation } from '../utils/translation';
 
@@ -488,9 +488,9 @@ export default function ShadowingPlayer({
   if (shouldShowFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 to-primary-800 w-screen h-screen overflow-hidden">
-        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-4 md:gap-6 p-4 md:p-8 pb-16 sm:pb-12 md:pb-10 lg:pb-20 xl:pb-24">
+        <div className="w-full h-full grid grid-rows-[min-content_1fr_min-content] justify-items-center gap-4 md:gap-6 [@media(max-height:500px)]:gap-2 p-4 md:p-8 pb-24 sm:pb-16 md:pb-10 lg:pb-20 xl:pb-24">
           {/* Countdown - fixed slot so phrase never shifts */}
-          <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] flex flex-col items-center justify-start pt-2 sm:pt-0">
+          <div className="w-full text-center pointer-events-none min-h-[40px] md:min-h-[56px] [@media(max-height:500px)]:min-h-[28px] flex flex-col items-center justify-start pt-2 sm:pt-0">
             {countdown !== null && countdown > 0 ? (
               <>
                 <div className="text-2xl md:text-3xl lg:text-4xl [@media(max-height:500px)]:text-xl font-bold text-white/90 leading-none animate-pulse">
@@ -522,7 +522,7 @@ export default function ShadowingPlayer({
                     : phrase.text.length > 60 
                     ? 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl' 
                     : 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl'
-                } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-3xl [@media(max-height:500px)]:mb-2`}
+                } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-2xl [@media(max-height:500px)]:mb-1`}
               >
                 {phrase.text}
               </h2>
@@ -534,7 +534,7 @@ export default function ShadowingPlayer({
                       : translatedText.length > 60 
                       ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl' 
                       : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
-                  } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-base`}
+                  } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-sm`}
                 >
                   {translatedText}
                 </p>
@@ -543,12 +543,12 @@ export default function ShadowingPlayer({
           </div>
 
           {/* Bottom controls */}
-          <div className="flex flex-col items-center gap-4 md:gap-6 w-full max-w-3xl px-4 pb-[env(safe-area-inset-bottom)] mx-auto justify-self-center">
+          <div className="flex flex-col items-center gap-4 md:gap-6 [@media(max-height:500px)]:gap-2 w-full max-w-3xl px-4 pb-[env(safe-area-inset-bottom)] mx-auto justify-self-center">
             <div className="text-center">
-              <div className="text-4xl md:text-5xl lg:text-6xl [@media(max-height:500px)]:text-3xl font-bold text-white mb-1 md:mb-2">
+              <div className="text-4xl md:text-5xl lg:text-6xl [@media(max-height:500px)]:text-2xl font-bold text-white mb-1 md:mb-2">
                 {currentRepetition} / {settings.repetitions}
               </div>
-              <p className="text-white/90 text-base md:text-lg lg:text-xl [@media(max-height:500px)]:text-sm">
+              <p className="text-white/90 text-base md:text-lg lg:text-xl [@media(max-height:500px)]:text-xs">
                 Repetitions
               </p>
             </div>
@@ -579,7 +579,7 @@ export default function ShadowingPlayer({
                   onClick={resetSession}
                   className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 [@media(max-height:500px)]:py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-colors font-semibold text-base md:text-lg shadow-lg"
                 >
-                  <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
+                  <Square className="w-5 h-5 md:w-6 md:h-6" />
                   Διακοπή
                 </button>
               )}

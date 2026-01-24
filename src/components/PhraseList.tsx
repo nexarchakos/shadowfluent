@@ -38,6 +38,7 @@ export default function PhraseList({
   const [isScrollable, setIsScrollable] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(false);
+  const selectedPhraseRef = useRef<HTMLButtonElement | null>(null);
   // Use controlled or uncontrolled state for showFavoritesOnly
   const [internalShowFavoritesOnly, setInternalShowFavoritesOnly] = useState(false);
   const showFavoritesOnly = showFavoritesOnlyProp !== undefined ? showFavoritesOnlyProp : internalShowFavoritesOnly;
@@ -190,6 +191,14 @@ export default function PhraseList({
     }
   }, [selectedPhrase?.id]);
 
+  useLayoutEffect(() => {
+    if (selectedPhraseRef.current) {
+      selectedPhraseRef.current.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [selectedPhrase?.id]);
+
+
+
   const getBadge = (phrase: Phrase) => {
     // Only show badges for AI-generated and uploaded phrases
     // Standard phrases don't need a badge (they're the default)
@@ -317,18 +326,19 @@ export default function PhraseList({
             return (
               <button
                 key={phrase.id}
+                ref={selectedPhrase?.id === phrase.id ? selectedPhraseRef : null}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectPhrase(phrase)}
                 type="button"
                 className={`
-                  w-full text-left p-5 rounded-xl transition-all transform hover:scale-[1.02] duration-200 relative
+                  w-full text-left p-5 rounded-xl transition-all duration-200 relative shadow-md border-2
                   ${selectedPhrase?.id === phrase.id
-                    ? 'bg-gradient-to-r from-primary-50 to-primary-100 border-2 border-primary-500 shadow-md'
+                    ? 'bg-gradient-to-r from-primary-50 to-primary-100 border-primary-500'
                     : phrase.source === 'uploaded'
-                    ? 'bg-blue-50 hover:bg-blue-100 border-2 border-transparent hover:border-blue-200'
+                    ? 'bg-blue-50 hover:bg-blue-100 border-transparent hover:border-blue-200'
                     : phrase.source === 'ai-generated'
-                    ? 'bg-purple-50 hover:bg-purple-100 border-2 border-transparent hover:border-purple-200'
-                    : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent hover:border-gray-200'
+                    ? 'bg-purple-50 hover:bg-purple-100 border-transparent hover:border-purple-200'
+                    : 'bg-gray-50 hover:bg-gray-100 border-transparent hover:border-gray-200'
                   }
                 `}
                 style={{ animationDelay: `${index * 50}ms` }}

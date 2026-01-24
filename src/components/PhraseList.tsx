@@ -38,6 +38,8 @@ export default function PhraseList({
   const [isScrollable, setIsScrollable] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(false);
+  const [scrollThumbTop, setScrollThumbTop] = useState(0);
+  const [scrollThumbHeight, setScrollThumbHeight] = useState(24);
   const selectedPhraseRef = useRef<HTMLButtonElement | null>(null);
   // Use controlled or uncontrolled state for showFavoritesOnly
   const [internalShowFavoritesOnly, setInternalShowFavoritesOnly] = useState(false);
@@ -140,6 +142,18 @@ export default function PhraseList({
     setIsScrollable(canScroll);
     setIsAtTop(el.scrollTop <= 1);
     setIsAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 1);
+    if (canScroll) {
+      const viewHeight = el.clientHeight;
+      const contentHeight = el.scrollHeight;
+      const thumbHeight = Math.max(28, Math.round((viewHeight / contentHeight) * viewHeight));
+      const maxTop = Math.max(1, viewHeight - thumbHeight);
+      const top = Math.round((el.scrollTop / (contentHeight - viewHeight)) * maxTop);
+      setScrollThumbHeight(thumbHeight);
+      setScrollThumbTop(Math.min(maxTop, Math.max(0, top)));
+    } else {
+      setScrollThumbHeight(24);
+      setScrollThumbTop(0);
+    }
   }, []);
 
   useEffect(() => {
@@ -383,15 +397,18 @@ export default function PhraseList({
         )}
         </div>
         {isScrollable && (
-          <div className="pointer-events-none absolute right-1 top-2 bottom-2 w-1 rounded-full bg-gray-200/80 sm:hidden" />
+          <div className="pointer-events-none absolute right-1 top-2 bottom-2 w-2 rounded-full bg-gray-200/80 sm:hidden">
+            <div
+              className="absolute left-0 right-0 rounded-full bg-gray-500/80 shadow-sm"
+              style={{ height: `${scrollThumbHeight}px`, top: `${scrollThumbTop}px` }}
+            />
+          </div>
         )}
         {isScrollable && !isAtTop && (
           <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-white to-transparent" />
         )}
         {isScrollable && !isAtBottom && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent flex items-end justify-center pb-2 sm:hidden">
-            <span className="text-[11px] font-medium text-gray-600">Scroll for more phrases</span>
-          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent sm:hidden" />
         )}
       </div>
     </div>

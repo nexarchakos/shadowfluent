@@ -43,6 +43,7 @@ export default function ShadowingPlayer({
   const lastCompletedRepetitionRef = useRef<number | null>(null); // Track the last completed repetition (0-based)
   const autoStartNextRef = useRef(false); // Track if we should auto-start next phrase (for race condition prevention)
   const isFinalCountdownRef = useRef(false); // Track if we're in the final countdown (after all repetitions)
+  const wakeLockRef = useRef<any>(null);
   
   // Helper to check if auto-start flag is set (works across re-mounts using sessionStorage as backup)
   const checkAutoStartFlag = () => {
@@ -59,13 +60,64 @@ export default function ShadowingPlayer({
     }
   };
 
+  const requestWakeLock = async () => {
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<any> } };
+    if (!nav.wakeLock) return;
+    try {
+      wakeLockRef.current = await nav.wakeLock.request('screen');
+      wakeLockRef.current?.addEventListener?.('release', () => {
+        wakeLockRef.current = null;
+      });
+    } catch (error) {
+      console.warn('Wake lock request failed:', error);
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (!wakeLockRef.current) return;
+    try {
+      await wakeLockRef.current.release();
+    } catch (error) {
+      console.warn('Wake lock release failed:', error);
+    } finally {
+      wakeLockRef.current = null;
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       ttsService.stop();
       isPlayingRef.current = false;
+      releaseWakeLock();
     };
   }, []);
+
+  useEffect(() => {
+    const shouldKeepAwake = isPlaying || isPaused;
+    if (shouldKeepAwake) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [isPlaying, isPaused]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (isPlayingRef.current && !isPausedRef.current) {
+          pauseSession();
+        }
+        releaseWakeLock();
+        return;
+      }
+      if (document.visibilityState === 'visible' && (isPlaying || isPaused)) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isPlaying, isPaused]);
 
   // Update translation when phrase or language changes
   useEffect(() => {

@@ -16,7 +16,11 @@ export default function TextPasteForm({ onSubmit }: TextPasteFormProps) {
     }
   };
 
-  const lineCount = text.split('\n').filter(line => line.trim()).length;
+  const lineCount = text
+    .replace(/\r\n/g, '\n')
+    .replace(/([.;\u037E])(\s+|$)/g, '$1\n')
+    .split('\n')
+    .filter(line => line.trim()).length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">

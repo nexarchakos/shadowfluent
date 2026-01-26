@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Phrase, ShadowingSettings, VoiceSettings, TranslationLanguage } from '../types';
-import { Play, Pause, RotateCcw, ArrowLeft, Square } from 'lucide-react';
+import { Play, Pause, RotateCcw, ArrowLeft, ArrowRight, Square } from 'lucide-react';
 import { ttsService } from '../utils/tts';
 import { getPhraseTranslation } from '../utils/translation';
 
@@ -12,6 +12,8 @@ interface ShadowingPlayerProps {
   onComplete: () => void;
   onNextPhrase?: () => void;
   hasNextPhrase?: boolean;
+  onPrevPhrase?: () => void;
+  hasPrevPhrase?: boolean;
 }
 
 export default function ShadowingPlayer({
@@ -22,6 +24,8 @@ export default function ShadowingPlayer({
   onComplete,
   onNextPhrase,
   hasNextPhrase = false,
+  onPrevPhrase,
+  hasPrevPhrase = false,
 }: ShadowingPlayerProps) {
   console.log('ShadowingPlayer render - phrase.id:', phrase.id, 'phrase.text:', phrase.text.substring(0, 50));
   const [currentRepetition, setCurrentRepetition] = useState(0);
@@ -534,6 +538,26 @@ export default function ShadowingPlayer({
     if (countdownRef.current) clearInterval(countdownRef.current);
   };
 
+  const goToAdjacentPhrase = (direction: 'next' | 'prev') => {
+    if (direction === 'next' && (!hasNextPhrase || !onNextPhrase)) return;
+    if (direction === 'prev' && (!hasPrevPhrase || !onPrevPhrase)) return;
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    ttsService.stop();
+    setCountdown(null);
+    setIsPaused(false);
+    isPausedRef.current = false;
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+    setIsFullscreen(true);
+    setAutoStartFlag(true);
+    setAutoStartNext(true);
+    if (direction === 'next') {
+      onNextPhrase?.();
+    } else {
+      onPrevPhrase?.();
+    }
+  };
+
   // Fullscreen component - TRUE fullscreen
   // Show fullscreen when playing or paused (not just when phrase is selected)
   // Also show fullscreen if autoStartNext is active (to prevent flicker during phrase transition)
@@ -582,10 +606,10 @@ export default function ShadowingPlayer({
               <h2 
                 className={`font-bold text-white mb-4 md:mb-6 leading-tight ${
                   phrase.text.length > 100 
-                    ? 'text-2xl sm:text-4xl md:text-5xl lg:text-6xl' 
+                    ? 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl' 
                     : phrase.text.length > 60 
-                    ? 'text-3xl sm:text-5xl md:text-6xl lg:text-7xl' 
-                    : 'text-4xl sm:text-6xl md:text-7xl lg:text-8xl'
+                    ? 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl' 
+                    : 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl'
                 } [@media(max-height:600px)]:text-4xl [@media(max-height:500px)]:text-2xl [@media(max-height:500px)]:mb-1`}
               >
                 {phrase.text}
@@ -594,16 +618,40 @@ export default function ShadowingPlayer({
                 <p 
                   className={`text-white/80 italic ${
                     translatedText.length > 100 
-                      ? 'text-base sm:text-xl md:text-2xl lg:text-3xl' 
+                      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl' 
                       : translatedText.length > 60 
-                      ? 'text-lg sm:text-2xl md:text-3xl lg:text-4xl' 
-                      : 'text-lg sm:text-2xl md:text-3xl lg:text-4xl'
+                      ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl' 
+                      : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
                   } [@media(max-height:600px)]:text-xl [@media(max-height:500px)]:text-sm`}
                 >
                   {translatedText}
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Phrase navigation - separate row */}
+          <div className="w-full max-w-3xl px-4 flex items-center justify-between gap-4">
+            {hasPrevPhrase ? (
+              <button
+                onClick={() => goToAdjacentPhrase('prev')}
+                aria-label="Previous phrase"
+                className="p-2 md:p-3 text-white/90 border border-white/30 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
+              </button>
+            ) : (
+              <div />
+            )}
+            {hasNextPhrase && (
+              <button
+                onClick={() => goToAdjacentPhrase('next')}
+                aria-label="Next phrase"
+                className="p-2 md:p-3 text-white/90 border border-white/30 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+              </button>
+            )}
           </div>
 
           {/* Bottom controls */}

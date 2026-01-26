@@ -266,13 +266,19 @@ function App() {
     setPhrases(shuffled);
   };
 
+  const splitPhrases = (text: string) => {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const withBreaks = normalized.replace(/([.;\u037E])(\s+|$)/g, '$1\n');
+    return withBreaks.split('\n').map(line => line.trim()).filter(Boolean);
+  };
+
   const handleTextSubmit = (text: string) => {
     if (!text || text.trim().length === 0) {
       alert('Please enter some phrases');
       return;
     }
 
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = splitPhrases(text);
     
     if (lines.length === 0) {
       alert('No phrases found. Please enter at least one phrase (one per line).');
@@ -364,7 +370,7 @@ function App() {
         return;
       }
 
-      const lines = text.split('\n').filter(line => line.trim());
+      const lines = splitPhrases(text);
       
       if (lines.length === 0) {
         alert('No phrases found in the file');
@@ -617,23 +623,26 @@ function App() {
                     console.log('Session completed');
                   }}
                   onNextPhrase={() => {
-                    // Add a small delay to prevent flicker during phrase transition
-                    // This keeps the fullscreen active while switching phrases
-                    setTimeout(() => {
-                      // Use filtered phrases based on showFavoritesOnly
-                      const filteredPhrases = showFavoritesOnly 
-                        ? phrases.filter(p => p.isFavorite)
-                        : phrases;
-                      
-                      // Find current phrase index in filtered list
-                      const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
-                      if (currentIndex >= 0 && currentIndex < filteredPhrases.length - 1) {
-                        // Move to next phrase and auto-start
-                        const nextPhrase = filteredPhrases[currentIndex + 1];
-                        setSelectedPhrase(nextPhrase);
-                        // The ShadowingPlayer will detect the phrase change and auto-start
-                      }
-                    }, 200); // Small delay to prevent flicker
+                    const filteredPhrases = showFavoritesOnly 
+                      ? phrases.filter(p => p.isFavorite)
+                      : phrases;
+                    
+                    const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
+                    if (currentIndex >= 0 && currentIndex < filteredPhrases.length - 1) {
+                      const nextPhrase = filteredPhrases[currentIndex + 1];
+                      setSelectedPhrase(nextPhrase);
+                    }
+                  }}
+                  onPrevPhrase={() => {
+                    const filteredPhrases = showFavoritesOnly 
+                      ? phrases.filter(p => p.isFavorite)
+                      : phrases;
+
+                    const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
+                    if (currentIndex > 0) {
+                      const prevPhrase = filteredPhrases[currentIndex - 1];
+                      setSelectedPhrase(prevPhrase);
+                    }
                   }}
                   hasNextPhrase={(() => {
                     // Use filtered phrases based on showFavoritesOnly
@@ -645,6 +654,14 @@ function App() {
                     const hasNext = currentIndex >= 0 && currentIndex < filteredPhrases.length - 1;
                     console.log('hasNextPhrase check - currentIndex:', currentIndex, 'filteredPhrases.length:', filteredPhrases.length, 'hasNext:', hasNext, 'showFavoritesOnly:', showFavoritesOnly);
                     return hasNext;
+                  })()}
+                  hasPrevPhrase={(() => {
+                    const filteredPhrases = showFavoritesOnly 
+                      ? phrases.filter(p => p.isFavorite)
+                      : phrases;
+
+                    const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
+                    return currentIndex > 0;
                   })()}
                 />
               ) : (

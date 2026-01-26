@@ -171,12 +171,13 @@ export class TTSService {
 
   speak(text: string, settings: VoiceSettings): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!this.synth || !this.supported) {
+      const synth = this.synth;
+      if (!synth || !this.supported) {
         resolve();
         return;
       }
       // Cancel any ongoing speech
-      this.synth.cancel();
+      synth.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voice = this.findVoice(settings);
@@ -212,7 +213,7 @@ export class TTSService {
       utterance.onerror = (error) => {
         // If speech was cancelled (paused), don't reject - just resolve
         // This prevents the catch block from closing fullscreen
-        if (wasCancelled || this.synth.speaking === false) {
+        if (wasCancelled || synth.speaking === false) {
           resolve();
         } else {
           reject(error);
@@ -222,22 +223,22 @@ export class TTSService {
       // Small delay to ensure voice is loaded
       setTimeout(() => {
         if (!wasCancelled) {
-          this.synth.speak(utterance);
+          synth.speak(utterance);
         } else {
           resolve();
         }
       }, 50);
       
       // Override cancel to mark as cancelled
-      const originalCancel = this.synth.cancel.bind(this.synth);
+      const originalCancel = synth.cancel.bind(synth);
       const cancelOverride = () => {
         wasCancelled = true;
         originalCancel();
       };
       
       // Store original cancel and override
-      (this.synth as any)._originalCancel = originalCancel;
-      this.synth.cancel = cancelOverride;
+      (synth as any)._originalCancel = originalCancel;
+      synth.cancel = cancelOverride;
     });
   }
 

@@ -268,8 +268,47 @@ function App() {
 
   const splitPhrases = (text: string) => {
     const normalized = text.replace(/\r\n/g, '\n');
-    const withBreaks = normalized.replace(/([.;\u037E])(\s+|$)/g, '$1\n');
-    return withBreaks.split('\n').map(line => line.trim()).filter(Boolean);
+    // Protect URLs/emails and decimals from splitting.
+    const protectedTokens: string[] = [];
+    const protect = (value: string) => {
+      const token = `__PROTECTED_${protectedTokens.length}__`;
+      protectedTokens.push(value);
+      return token;
+    };
+
+    const abbreviations = [
+      'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Sr.', 'Jr.', 'St.',
+      'e.g.', 'i.e.', 'etc.', 'vs.',
+      'κ.', 'κκ.', 'κα.', 'π.χ.', 'δηλ.', 'κλπ.', 'α.λ.'
+    ];
+
+    let safe = normalized
+      // Protect URLs
+      .replace(/https?:\/\/\S+/g, (m) => protect(m))
+      // Protect emails
+      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, (m) => protect(m))
+      // Protect decimals like 3.14
+      .replace(/(\d)\.(\d)/g, (_m, a, b) => `${a}__DECIMAL__${b}`);
+
+    // Protect common abbreviations
+    abbreviations.forEach((abbr) => {
+      const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      safe = safe.replace(new RegExp(`\\b${escaped}`, 'g'), (m) => protect(m));
+    });
+
+    safe = safe.replace(/([.;\u037E?!])\s*/g, '$1\n');
+
+    const lines = safe
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) =>
+        line
+          .replace(/__DECIMAL__/g, '.')
+          .replace(/__PROTECTED_(\d+)__/g, (_m, i) => protectedTokens[Number(i)])
+      );
+
+    return lines;
   };
 
   const handleTextSubmit = (text: string) => {

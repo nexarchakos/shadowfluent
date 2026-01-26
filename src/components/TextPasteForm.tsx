@@ -16,11 +16,38 @@ export default function TextPasteForm({ onSubmit }: TextPasteFormProps) {
     }
   };
 
-  const lineCount = text
-    .replace(/\r\n/g, '\n')
-    .replace(/([.;\u037E])(\s+|$)/g, '$1\n')
-    .split('\n')
-    .filter(line => line.trim()).length;
+  const lineCount = (() => {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const protectedTokens: string[] = [];
+    const protect = (value: string) => {
+      const token = `__PROTECTED_${protectedTokens.length}__`;
+      protectedTokens.push(value);
+      return token;
+    };
+
+    const abbreviations = [
+      'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Sr.', 'Jr.', 'St.',
+      'e.g.', 'i.e.', 'etc.', 'vs.',
+      'κ.', 'κκ.', 'κα.', 'π.χ.', 'δηλ.', 'κλπ.', 'α.λ.'
+    ];
+
+    let safe = normalized
+      .replace(/https?:\/\/\S+/g, (m) => protect(m))
+      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, (m) => protect(m))
+      .replace(/(\d)\.(\d)/g, (_m, a, b) => `${a}__DECIMAL__${b}`);
+
+    abbreviations.forEach((abbr) => {
+      const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      safe = safe.replace(new RegExp(`\\b${escaped}`, 'g'), (m) => protect(m));
+    });
+
+    safe = safe.replace(/([.;\u037E?!])\s*/g, '$1\n');
+
+    return safe
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean).length;
+  })();
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">

@@ -1,20 +1,29 @@
 import { VoiceSettings } from '../types';
 
 export class TTSService {
-  private synth: SpeechSynthesis;
+  private synth: SpeechSynthesis | null;
   private voices: SpeechSynthesisVoice[] = [];
+  private supported: boolean;
 
   constructor() {
-    this.synth = window.speechSynthesis;
+    const hasWindow = typeof window !== 'undefined';
+    const hasSynth = hasWindow && 'speechSynthesis' in window;
+    const hasUtterance = typeof SpeechSynthesisUtterance !== 'undefined';
+    this.supported = hasWindow && hasSynth && hasUtterance;
+    this.synth = this.supported ? window.speechSynthesis : null;
     this.loadVoices();
     
     // Reload voices when they become available
-    if (speechSynthesis.onvoiceschanged !== undefined) {
+    if (this.synth && speechSynthesis.onvoiceschanged !== undefined) {
       speechSynthesis.onvoiceschanged = () => this.loadVoices();
     }
   }
 
   private loadVoices() {
+    if (!this.synth) {
+      this.voices = [];
+      return;
+    }
     this.voices = this.synth.getVoices();
   }
 
@@ -162,6 +171,10 @@ export class TTSService {
 
   speak(text: string, settings: VoiceSettings): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (!this.synth || !this.supported) {
+        resolve();
+        return;
+      }
       // Cancel any ongoing speech
       this.synth.cancel();
 
@@ -229,11 +242,16 @@ export class TTSService {
   }
 
   stop() {
+    if (!this.synth) return;
     this.synth.cancel();
   }
 
   isSpeaking(): boolean {
-    return this.synth.speaking;
+    return this.synth ? this.synth.speaking : false;
+  }
+
+  isSupported(): boolean {
+    return this.supported;
   }
 }
 

@@ -32,6 +32,7 @@ export default function ShadowingPlayer({
   const [autoStartNext, setAutoStartNext] = useState(false);
   const isFullscreenRef = useRef(false); // Track fullscreen state to prevent flicker
   const [translatedText, setTranslatedText] = useState<string | undefined>(phrase.translation);
+  const [isSilentMode, setIsSilentMode] = useState(!ttsService.isSupported());
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(false); // Prevent infinite loops
   const isPausedRef = useRef(false); // Track paused state to avoid race conditions
@@ -91,6 +92,12 @@ export default function ShadowingPlayer({
       isPlayingRef.current = false;
       releaseWakeLock();
     };
+  }, []);
+
+  useEffect(() => {
+    if (!ttsService.isSupported()) {
+      setIsSilentMode(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -562,6 +569,11 @@ export default function ShadowingPlayer({
                 </p>
               </div>
             )}
+            {isSilentMode && (
+              <p className="mt-1 text-[11px] md:text-xs text-white/80">
+                Silent mode — voice not supported on this device
+              </p>
+            )}
           </div>
 
           {/* Text area - centered but never clipped; scroll if needed */}
@@ -649,6 +661,11 @@ export default function ShadowingPlayer({
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{phrase.text}</h2>
         {translatedText && (
           <p className="text-gray-600 italic">{translatedText}</p>
+        )}
+        {isSilentMode && (
+          <p className="mt-2 text-xs text-gray-500">
+            Silent mode — voice not supported on this device
+          </p>
         )}
       </div>
 

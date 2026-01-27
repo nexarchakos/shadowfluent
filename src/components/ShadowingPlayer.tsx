@@ -360,6 +360,7 @@ export default function ShadowingPlayer({
   const pauseSession = () => {
     // CRITICAL: Set paused ref FIRST (before state) to avoid race conditions
     isPausedRef.current = true;
+    ttsService.stop();
     setIsPaused(true);
     // CRITICAL: Keep isPlaying true - don't change it to false
     // The fullscreen condition is: isFullscreen && (isPlaying || isPaused)

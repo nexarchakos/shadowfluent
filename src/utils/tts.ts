@@ -26,6 +26,8 @@ export class TTSService {
   private supported: boolean;
   private currentAudio: HTMLAudioElement | null = null;
   private currentAbort: AbortController | null = null;
+  private audioElement: HTMLAudioElement | null = null;
+  private currentObjectUrl: string | null = null;
   private lastEngineUsed: 'elevenlabs' | 'browser' | null = null;
   private lastError: string | null = null;
 
@@ -299,13 +301,24 @@ export class TTSService {
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      if (this.currentObjectUrl) {
+        URL.revokeObjectURL(this.currentObjectUrl);
+      }
+      this.currentObjectUrl = url;
+      const audio = this.audioElement || new Audio();
+      this.audioElement = audio;
       this.currentAudio = audio;
       audio.preload = 'auto';
       (audio as any).playsInline = true;
+      audio.src = url;
       audio.load();
 
-      await this.playAudio(audio, url);
+      await this.playAudio(audio, () => {
+        if (this.currentObjectUrl) {
+          URL.revokeObjectURL(this.currentObjectUrl);
+          this.currentObjectUrl = null;
+        }
+      });
       return;
     }
 
@@ -341,16 +354,27 @@ export class TTSService {
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+    }
+    this.currentObjectUrl = url;
+    const audio = this.audioElement || new Audio();
+    this.audioElement = audio;
     this.currentAudio = audio;
     audio.preload = 'auto';
     (audio as any).playsInline = true;
+    audio.src = url;
     audio.load();
 
-    await this.playAudio(audio, url);
+    await this.playAudio(audio, () => {
+      if (this.currentObjectUrl) {
+        URL.revokeObjectURL(this.currentObjectUrl);
+        this.currentObjectUrl = null;
+      }
+    });
   }
 
-  private async playAudio(audio: HTMLAudioElement, url?: string): Promise<void> {
+  private async playAudio(audio: HTMLAudioElement, onCleanup?: () => void): Promise<void> {
     return new Promise((resolve, reject) => {
       let startTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
         cleanup();
@@ -371,9 +395,7 @@ export class TTSService {
 
       const cleanup = () => {
         clearTimers();
-        if (url) {
-          URL.revokeObjectURL(url);
-        }
+        if (onCleanup) onCleanup();
       };
 
       const finish = () => {
@@ -511,7 +533,12 @@ export class TTSService {
     }
     if (this.currentAudio) {
       this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
       this.currentAudio = null;
+    }
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = null;
     }
     if (!this.synth) return;
     this.synth.cancel();

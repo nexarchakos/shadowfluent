@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'ElevenLabs voice id not configured' });
     }
 
-    const modelId = process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2';
+    const modelId = process.env.ELEVENLABS_MODEL || 'eleven_flash_v2';
 
     const rateMap = {
       slow: 0.7,

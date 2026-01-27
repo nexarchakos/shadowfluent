@@ -27,7 +27,9 @@ export class TTSService {
   private currentAudio: HTMLAudioElement | null = null;
   private currentAbort: AbortController | null = null;
   private audioElement: HTMLAudioElement | null = null;
-  private currentObjectUrl: string | null = null;
+  private elevenCacheKey: string | null = null;
+  private elevenCacheUrl: string | null = null;
+  private elevenPrefetches: Map<string, Promise<void>> = new Map();
   private lastEngineUsed: 'elevenlabs' | 'browser' | null = null;
   private lastError: string | null = null;
 
@@ -232,6 +234,23 @@ export class TTSService {
     return voice || null;
   }
 
+  private getElevenCacheKey(text: string, settings: VoiceSettings) {
+    return `${settings.gender}|${settings.accent}|${settings.rate}|${text}`;
+  }
+
+  private getElevenCache(key: string) {
+    if (this.elevenCacheKey === key) return this.elevenCacheUrl;
+    return null;
+  }
+
+  private setElevenCache(key: string, url: string) {
+    if (this.elevenCacheKey && this.elevenCacheKey !== key && this.elevenCacheUrl) {
+      URL.revokeObjectURL(this.elevenCacheUrl);
+    }
+    this.elevenCacheKey = key;
+    this.elevenCacheUrl = url;
+  }
+
   private getDirectVoiceId(settings: VoiceSettings): string | null {
     const byAccentMale: Record<string, string | undefined> = {
       british: ELEVEN_DIRECT_VOICE_BRITISH_MALE,
@@ -261,24 +280,14 @@ export class TTSService {
     return ELEVEN_DIRECT_VOICE_DEFAULT || null;
   }
 
-  private async speakElevenLabs(text: string, settings: VoiceSettings): Promise<void> {
+  private async fetchElevenAudio(text: string, settings: VoiceSettings, signal?: AbortSignal): Promise<string> {
     if (!ELEVEN_PROXY_ENABLED) {
       const voiceId = this.getDirectVoiceId(settings);
-      if (!ELEVEN_DIRECT_API_KEY || !voiceId) return;
-
-      if (this.currentAbort) {
-        this.currentAbort.abort();
-        this.currentAbort = null;
-      }
-      if (this.currentAudio) {
-        this.currentAudio.pause();
-        this.currentAudio = null;
+      if (!ELEVEN_DIRECT_API_KEY || !voiceId) {
+        throw new Error('ElevenLabs not configured');
       }
 
-      const controller = new AbortController();
-      this.currentAbort = controller;
-
-      const modelId = ELEVEN_DIRECT_MODEL || 'eleven_multilingual_v2';
+      const modelId = ELEVEN_DIRECT_MODEL || 'eleven_flash_v2';
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {
@@ -291,7 +300,7 @@ export class TTSService {
           model_id: modelId,
           voice_settings: { stability: 0.4, similarity_boost: 0.8 },
         }),
-        signal: controller.signal,
+        signal,
       });
 
       if (!response.ok) {
@@ -300,26 +309,65 @@ export class TTSService {
       }
 
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      if (this.currentObjectUrl) {
-        URL.revokeObjectURL(this.currentObjectUrl);
-      }
-      this.currentObjectUrl = url;
+      return URL.createObjectURL(blob);
+    }
+
+    const response = await fetch(ELEVEN_PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        settings,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '');
+      throw new Error(`ElevenLabs error: ${response.status}${responseText ? ` - ${responseText}` : ''}`);
+    }
+
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  prefetchElevenLabs(text: string, settings: VoiceSettings) {
+    if (settings.provider !== 'elevenlabs') return;
+    if (!this.isElevenLabsConfigured()) return;
+    const key = this.getElevenCacheKey(text, settings);
+    if (this.getElevenCache(key)) return;
+    if (this.elevenPrefetches.has(key)) return;
+
+    const promise = this.fetchElevenAudio(text, settings)
+      .then((url) => {
+        this.setElevenCache(key, url);
+      })
+      .finally(() => {
+        this.elevenPrefetches.delete(key);
+      });
+    this.elevenPrefetches.set(key, promise);
+  }
+
+  private async speakElevenLabs(text: string, settings: VoiceSettings): Promise<void> {
+    const cacheKey = this.getElevenCacheKey(text, settings);
+    const cachedUrl = this.getElevenCache(cacheKey);
+    if (cachedUrl) {
       const audio = this.audioElement || new Audio();
       this.audioElement = audio;
       this.currentAudio = audio;
       audio.preload = 'auto';
       (audio as any).playsInline = true;
-      audio.src = url;
+      audio.src = cachedUrl;
       audio.load();
-
-      await this.playAudio(audio, () => {
-        if (this.currentObjectUrl) {
-          URL.revokeObjectURL(this.currentObjectUrl);
-          this.currentObjectUrl = null;
-        }
-      });
+      await this.playAudio(audio);
       return;
+    }
+
+    if (!ELEVEN_PROXY_ENABLED) {
+      // direct mode handled in fetchElevenAudio below
     }
 
     if (this.currentAbort) {
@@ -334,30 +382,8 @@ export class TTSService {
     const controller = new AbortController();
     this.currentAbort = controller;
 
-    const response = await fetch(ELEVEN_PROXY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'audio/mpeg',
-      },
-      body: JSON.stringify({
-        text,
-        settings,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => '');
-      throw new Error(`ElevenLabs error: ${response.status}${responseText ? ` - ${responseText}` : ''}`);
-    }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-    }
-    this.currentObjectUrl = url;
+    const url = await this.fetchElevenAudio(text, settings, controller.signal);
+    this.setElevenCache(cacheKey, url);
     const audio = this.audioElement || new Audio();
     this.audioElement = audio;
     this.currentAudio = audio;
@@ -365,13 +391,7 @@ export class TTSService {
     (audio as any).playsInline = true;
     audio.src = url;
     audio.load();
-
-    await this.playAudio(audio, () => {
-      if (this.currentObjectUrl) {
-        URL.revokeObjectURL(this.currentObjectUrl);
-        this.currentObjectUrl = null;
-      }
-    });
+    await this.playAudio(audio);
   }
 
   private async playAudio(audio: HTMLAudioElement, onCleanup?: () => void): Promise<void> {
@@ -536,9 +556,10 @@ export class TTSService {
       this.currentAudio.currentTime = 0;
       this.currentAudio = null;
     }
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-      this.currentObjectUrl = null;
+    if (this.elevenCacheUrl) {
+      URL.revokeObjectURL(this.elevenCacheUrl);
+      this.elevenCacheUrl = null;
+      this.elevenCacheKey = null;
     }
     if (!this.synth) return;
     this.synth.cancel();

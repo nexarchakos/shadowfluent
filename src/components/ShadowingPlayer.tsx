@@ -139,6 +139,10 @@ export default function ShadowingPlayer({
     updateTranslation();
   }, [phrase.text, phrase.translation, translationLanguage]);
 
+  useEffect(() => {
+    ttsService.prefetchElevenLabs(phrase.text, voiceSettings);
+  }, [phrase.text, voiceSettings]);
+
   // Reset when phrase changes (unless it's auto-advance)
   useEffect(() => {
     // Only run if phrase actually changed

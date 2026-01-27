@@ -33,7 +33,6 @@ export const initGTM = (): void => {
  */
 export const pushGTMEvent = (eventName: string, eventData?: Record<string, any>): void => {
   if (typeof window === 'undefined' || !window.dataLayer) {
-    console.warn('GTM dataLayer is not initialized');
     return;
   }
 

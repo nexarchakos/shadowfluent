@@ -9,7 +9,6 @@ export const injectGTM = (): void => {
   const containerId = import.meta.env.VITE_GTM_CONTAINER_ID;
 
   if (!containerId || containerId === 'GTM-XXXXXXX') {
-    console.log('GTM Container ID not configured. GTM will not be loaded.');
     return;
   }
 

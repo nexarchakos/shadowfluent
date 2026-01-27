@@ -107,7 +107,6 @@ export default function PhraseList({
                   }
                 } catch (error) {
                   // Silently fail for translation errors
-                  console.warn('Translation error for phrase:', phrase.id, error);
                 }
               } else if (phrase.translation) {
                 newTranslations[phrase.id] = phrase.translation;

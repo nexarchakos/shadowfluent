@@ -1,9 +1,16 @@
 import { VoiceSettings } from '../types';
 
+const ELEVEN_PROXY_URL = (import.meta.env.VITE_ELEVENLABS_PROXY_URL as string | undefined) || '/api/elevenlabs-tts';
+const ELEVEN_PROXY_ENABLED = (import.meta.env.VITE_ELEVENLABS_PROXY_ENABLED as string | undefined) === 'true';
+
 export class TTSService {
   private synth: SpeechSynthesis | null;
   private voices: SpeechSynthesisVoice[] = [];
   private supported: boolean;
+  private currentAudio: HTMLAudioElement | null = null;
+  private currentAbort: AbortController | null = null;
+  private lastEngineUsed: 'elevenlabs' | 'browser' | null = null;
+  private lastError: string | null = null;
 
   constructor() {
     const hasWindow = typeof window !== 'undefined';
@@ -25,6 +32,58 @@ export class TTSService {
       return;
     }
     this.voices = this.synth.getVoices();
+  }
+
+  private isFemaleVoice(voice: SpeechSynthesisVoice) {
+    const nameLower = voice.name.toLowerCase();
+    return nameLower.includes('female') || nameLower.includes('zira') ||
+      nameLower.includes('samantha') || nameLower.includes('karen') ||
+      nameLower.includes('susan') || nameLower.includes('linda') ||
+      nameLower.includes('heather') || nameLower.includes('moira');
+  }
+
+  private isMaleVoice(voice: SpeechSynthesisVoice) {
+    const nameLower = voice.name.toLowerCase();
+    return nameLower.includes('male') || nameLower.includes('david') ||
+      nameLower.includes('alex') || nameLower.includes('daniel') ||
+      nameLower.includes('tom') || nameLower.includes('lee') ||
+      nameLower.includes('james') || nameLower.includes('thomas') ||
+      nameLower.includes('nick') || nameLower.includes('oliver') ||
+      nameLower.includes('mark') || nameLower.includes('kevin');
+  }
+
+  private scoreVoice(voice: SpeechSynthesisVoice, settings: VoiceSettings) {
+    const nameLower = voice.name.toLowerCase();
+    let score = 0;
+
+    const isFemale = this.isFemaleVoice(voice);
+    const isMale = this.isMaleVoice(voice);
+    if (settings.gender === 'female') {
+      if (isFemale) score += 50;
+      else if (isMale) score -= 50;
+    } else {
+      if (isMale) score += 50;
+      else if (isFemale) score -= 50;
+    }
+
+    const accentMap: Record<string, string> = {
+      british: 'GB',
+      american: 'US',
+      australian: 'AU',
+      irish: 'IE',
+      canadian: 'CA',
+    };
+    const accent = accentMap[settings.accent] || 'US';
+    if (voice.lang.includes(accent) || voice.lang.includes('en')) score += 20;
+
+    if (nameLower.includes('google') || nameLower.includes('microsoft') || nameLower.includes('apple') || nameLower.includes('siri')) {
+      score += 15;
+    }
+    if (nameLower.includes('default')) score -= 5;
+    if (nameLower.includes('espeak') || nameLower.includes('festival')) score -= 20;
+
+    if (voice.lang.startsWith('en')) score += 5;
+    return score;
   }
 
   private findVoice(settings: VoiceSettings): SpeechSynthesisVoice | null {
@@ -90,20 +149,8 @@ export class TTSService {
       
       if (!hasAccent) return false;
       
-      const nameLower = v.name.toLowerCase();
-      // More comprehensive female detection
-      const isFemale = nameLower.includes('female') || nameLower.includes('zira') || 
-                       nameLower.includes('samantha') || nameLower.includes('karen') ||
-                       nameLower.includes('susan') || nameLower.includes('linda') ||
-                       nameLower.includes('heather') || nameLower.includes('moira');
-      
-      // More comprehensive male detection - critical for Canadian
-      const isMale = nameLower.includes('male') || nameLower.includes('david') || 
-                     nameLower.includes('alex') || nameLower.includes('daniel') ||
-                     nameLower.includes('tom') || nameLower.includes('lee') ||
-                     nameLower.includes('james') || nameLower.includes('thomas') ||
-                     nameLower.includes('nick') || nameLower.includes('oliver') ||
-                     nameLower.includes('mark') || nameLower.includes('kevin');
+      const isFemale = this.isFemaleVoice(v);
+      const isMale = this.isMaleVoice(v);
       
       if (gender === 'female') {
         // For female, prioritize female voices, but accept neutral if no female found
@@ -134,12 +181,7 @@ export class TTSService {
         
         // For male voices, still reject female voices even in fallback
         if (gender === 'male') {
-          const nameLower = v.name.toLowerCase();
-          const isFemale = nameLower.includes('female') || nameLower.includes('zira') || 
-                           nameLower.includes('samantha') || nameLower.includes('karen') ||
-                           nameLower.includes('susan') || nameLower.includes('linda') ||
-                           nameLower.includes('heather') || nameLower.includes('moira');
-          return !isFemale; // Accept only if not female
+          return !this.isFemaleVoice(v); // Accept only if not female
         }
         
         return true; // For female, accept any voice with accent
@@ -152,24 +194,79 @@ export class TTSService {
       voice = this.voices.find(v => {
         if (!v.lang.startsWith('en')) return false;
         
-        // For male voices, still reject female voices even in final fallback
         if (gender === 'male') {
-          const nameLower = v.name.toLowerCase();
-          const isFemale = nameLower.includes('female') || nameLower.includes('zira') || 
-                           nameLower.includes('samantha') || nameLower.includes('karen') ||
-                           nameLower.includes('susan') || nameLower.includes('linda') ||
-                           nameLower.includes('heather') || nameLower.includes('moira');
-          return !isFemale; // Accept only if not female
+          return !this.isFemaleVoice(v); // Accept only if not female
         }
         
         return true; // For female, accept any English voice
       });
     }
 
+    if (!voice) {
+      const scored = [...this.voices]
+        .filter(v => v.lang.startsWith('en'))
+        .map(v => ({ v, score: this.scoreVoice(v, settings) }))
+        .sort((a, b) => b.score - a.score);
+      voice = scored[0]?.v || null;
+    }
+
     return voice || null;
   }
 
-  speak(text: string, settings: VoiceSettings): Promise<void> {
+  private async speakElevenLabs(text: string, settings: VoiceSettings): Promise<void> {
+    if (this.currentAbort) {
+      this.currentAbort.abort();
+      this.currentAbort = null;
+    }
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+
+    const controller = new AbortController();
+    this.currentAbort = controller;
+
+    const response = await fetch(ELEVEN_PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        settings,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '');
+      throw new Error(`ElevenLabs error: ${response.status}${responseText ? ` - ${responseText}` : ''}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    this.currentAudio = audio;
+
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('ElevenLabs audio error'));
+      };
+      audio.play().catch(reject);
+    });
+  }
+
+  private speakBrowser(text: string, settings: VoiceSettings, preserveError = false): Promise<void> {
+    this.lastEngineUsed = 'browser';
+    if (!preserveError) {
+      this.lastError = null;
+    }
     return new Promise((resolve, reject) => {
       const synth = this.synth;
       if (!synth || !this.supported) {
@@ -242,7 +339,35 @@ export class TTSService {
     });
   }
 
+  speak(text: string, settings: VoiceSettings): Promise<void> {
+    if (settings.provider === 'elevenlabs' && this.isElevenLabsConfigured()) {
+      return this.speakElevenLabs(text, settings)
+        .then(() => {
+          this.lastEngineUsed = 'elevenlabs';
+          this.lastError = null;
+        })
+        .catch((error) => {
+          // Fallback to browser TTS if ElevenLabs fails
+          const message = error instanceof Error ? error.message : 'ElevenLabs error';
+          this.lastError = message;
+          return this.speakBrowser(text, { ...settings, provider: 'browser' }, true);
+        });
+    }
+    if (settings.provider === 'elevenlabs' && !this.isElevenLabsConfigured()) {
+      this.lastError = 'ElevenLabs not configured';
+    }
+    return this.speakBrowser(text, settings);
+  }
+
   stop() {
+    if (this.currentAbort) {
+      this.currentAbort.abort();
+      this.currentAbort = null;
+    }
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
     if (!this.synth) return;
     this.synth.cancel();
   }
@@ -253,6 +378,25 @@ export class TTSService {
 
   isSupported(): boolean {
     return this.supported;
+  }
+
+  isElevenLabsConfigured(): boolean {
+    return ELEVEN_PROXY_ENABLED;
+  }
+
+  isAvailable(settings: VoiceSettings): boolean {
+    if (settings.provider === 'elevenlabs') {
+      return this.isElevenLabsConfigured() || this.isSupported();
+    }
+    return this.isSupported();
+  }
+
+  getLastEngineUsed(): 'elevenlabs' | 'browser' | null {
+    return this.lastEngineUsed;
+  }
+
+  getLastError(): string | null {
+    return this.lastError;
   }
 }
 

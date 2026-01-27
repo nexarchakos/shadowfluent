@@ -61,7 +61,6 @@ async function _translateWithAPI(
       return data.responseData.translatedText;
     }
   } catch (error) {
-    console.error('Translation API error:', error);
   }
   */
 

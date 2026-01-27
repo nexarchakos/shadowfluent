@@ -1,4 +1,5 @@
 import { ShadowingSettings, VoiceSettings } from '../types';
+import { ttsService } from '../utils/tts';
 import { Settings } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -70,6 +71,43 @@ export default function SettingsPanel({
           </div>
 
           {/* Voice Settings */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Voice Engine
+            </label>
+            <div className="flex gap-4 mb-2">
+              <button
+                onClick={() =>
+                  onVoiceSettingsChange({ ...voiceSettings, provider: 'browser' })
+                }
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  voiceSettings.provider === 'browser'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Browser Voice
+              </button>
+              <button
+                onClick={() =>
+                  onVoiceSettingsChange({ ...voiceSettings, provider: 'elevenlabs' })
+                }
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  voiceSettings.provider === 'elevenlabs'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Real Human Voice
+              </button>
+            </div>
+            {voiceSettings.provider === 'elevenlabs' && !ttsService.isElevenLabsConfigured() && (
+              <p className="text-xs text-gray-600">
+                ElevenLabs δεν είναι ρυθμισμένο — γίνεται χρήση browser voice.
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Φύλο Φωνής

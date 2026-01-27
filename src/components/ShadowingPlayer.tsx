@@ -27,7 +27,6 @@ export default function ShadowingPlayer({
   onPrevPhrase,
   hasPrevPhrase = false,
 }: ShadowingPlayerProps) {
-  console.log('ShadowingPlayer render - phrase.id:', phrase.id, 'phrase.text:', phrase.text.substring(0, 50));
   const [currentRepetition, setCurrentRepetition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -36,7 +35,9 @@ export default function ShadowingPlayer({
   const [autoStartNext, setAutoStartNext] = useState(false);
   const isFullscreenRef = useRef(false); // Track fullscreen state to prevent flicker
   const [translatedText, setTranslatedText] = useState<string | undefined>(phrase.translation);
-  const [isSilentMode, setIsSilentMode] = useState(!ttsService.isSupported());
+  const [isSilentMode, setIsSilentMode] = useState(!ttsService.isAvailable(voiceSettings));
+  const [ttsEngineUsed, setTtsEngineUsed] = useState<'elevenlabs' | 'browser' | null>(null);
+  const [ttsError, setTtsError] = useState<string | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(false); // Prevent infinite loops
   const isPausedRef = useRef(false); // Track paused state to avoid race conditions
@@ -73,18 +74,14 @@ export default function ShadowingPlayer({
       wakeLockRef.current?.addEventListener?.('release', () => {
         wakeLockRef.current = null;
       });
-    } catch (error) {
-      console.warn('Wake lock request failed:', error);
-    }
+    } catch (error) {}
   };
 
   const releaseWakeLock = async () => {
     if (!wakeLockRef.current) return;
     try {
       await wakeLockRef.current.release();
-    } catch (error) {
-      console.warn('Wake lock release failed:', error);
-    } finally {
+    } catch (error) {} finally {
       wakeLockRef.current = null;
     }
   };
@@ -99,10 +96,8 @@ export default function ShadowingPlayer({
   }, []);
 
   useEffect(() => {
-    if (!ttsService.isSupported()) {
-      setIsSilentMode(true);
-    }
-  }, []);
+    setIsSilentMode(!ttsService.isAvailable(voiceSettings));
+  }, [voiceSettings]);
 
   useEffect(() => {
     const shouldKeepAwake = isPlaying || isPaused;
@@ -146,14 +141,11 @@ export default function ShadowingPlayer({
 
   // Reset when phrase changes (unless it's auto-advance)
   useEffect(() => {
-    console.log('useEffect triggered - phrase.id:', phrase.id, 'previousPhraseId.current:', previousPhraseId.current, 'autoStartNext:', autoStartNext, 'autoStartNextRef.current:', autoStartNextRef.current);
-    
     // Only run if phrase actually changed
     if (previousPhraseId.current === null) {
       // First time - but check if this is an auto-advance scenario
       const shouldAutoStart = autoStartNext || checkAutoStartFlag();
       if (shouldAutoStart) {
-        console.log('First time but autoStartNext is true - this is auto-advance, starting phrase');
         previousPhraseId.current = phrase.id;
         setCurrentRepetition(1);
         setCountdown(null);
@@ -165,10 +157,8 @@ export default function ShadowingPlayer({
         // Set isPlayingRef immediately before setTimeout to ensure it's true
         isPlayingRef.current = true;
         setTimeout(() => {
-          console.log('Auto-starting playPhrase(0) for new phrase (first time), isPlayingRef.current:', isPlayingRef.current);
           // Ensure isPlayingRef is still true before calling playPhrase (may have been reset by cleanup)
           if (!isPlayingRef.current) {
-            console.warn('isPlayingRef was reset, setting it to true again');
             isPlayingRef.current = true;
             setIsPlaying(true);
           }
@@ -179,17 +169,14 @@ export default function ShadowingPlayer({
         return;
       }
       // First time - just set the ID, don't reset anything
-      console.log('First time - setting previousPhraseId to:', phrase.id);
       previousPhraseId.current = phrase.id;
       return;
     }
 
     if (phrase.id !== previousPhraseId.current) {
       const shouldAutoStart = autoStartNext || checkAutoStartFlag();
-      console.log('Phrase changed detected - phrase.id:', phrase.id, 'previousPhraseId:', previousPhraseId.current, 'autoStartNext:', autoStartNext, 'shouldAutoStart:', shouldAutoStart);
       // Check both state and ref/sessionStorage to handle race conditions
       if (shouldAutoStart) {
-        console.log('Auto-advance detected, starting next phrase');
         // This is an auto-advance scenario - keep playing and fullscreen
         previousPhraseId.current = phrase.id;
         // Reset repetition counter but keep fullscreen and playing state
@@ -203,7 +190,6 @@ export default function ShadowingPlayer({
         setAutoStartFlag(false); // Clear flag including sessionStorage
         // Small delay for smooth transition
         setTimeout(() => {
-          console.log('Auto-starting playPhrase(0) for new phrase');
           playPhrase(0); // Still pass 0 internally for logic
         }, 300);
       } else {
@@ -244,12 +230,10 @@ export default function ShadowingPlayer({
   };
 
   const playPhrase = async (repetitionNumber: number) => {
-    console.log('playPhrase called - repetitionNumber:', repetitionNumber, 'isPlayingRef.current:', isPlayingRef.current, 'settings.repetitions:', settings.repetitions);
     // Safety check to prevent infinite loops
     // Note: repetitionNumber is 0-based, so if repetitions=3, valid numbers are 0, 1, 2
     // We should stop if repetitionNumber >= settings.repetitions (e.g., if 3 >= 3)
     if (!isPlayingRef.current || repetitionNumber >= settings.repetitions) {
-      console.warn('playPhrase stopped - isPlayingRef:', isPlayingRef.current, 'repetitionNumber:', repetitionNumber, '>= settings.repetitions:', settings.repetitions);
       setIsPlaying(false);
       setCountdown(null);
       isPlayingRef.current = false;
@@ -263,6 +247,8 @@ export default function ShadowingPlayer({
       setCurrentRepetition(repetitionNumber + 1);
       
       await ttsService.speak(phrase.text, voiceSettings);
+      setTtsEngineUsed(ttsService.getLastEngineUsed());
+      setTtsError(ttsService.getLastError());
       
       // Check if paused during speech - if so, don't continue
       // Use ONLY refs to avoid race conditions with state updates
@@ -306,8 +292,6 @@ export default function ShadowingPlayer({
       } else {
         // All repetitions completed for this phrase
         // Show countdown one last time before advancing to next phrase (or finishing)
-        console.log('All repetitions completed. hasNextPhrase:', hasNextPhrase, 'onNextPhrase:', !!onNextPhrase, 'isPlayingRef:', isPlayingRef.current);
-        
         // Mark this as final countdown
         isFinalCountdownRef.current = true;
         
@@ -334,9 +318,7 @@ export default function ShadowingPlayer({
             isFinalCountdownRef.current = false;
             
             // Check if there's a next phrase
-            console.log('Final countdown check - hasNextPhrase:', hasNextPhrase, 'onNextPhrase:', !!onNextPhrase, 'isPlayingRef.current:', isPlayingRef.current, 'isPausedRef.current:', isPausedRef.current);
             if (hasNextPhrase && onNextPhrase && isPlayingRef.current && !isPausedRef.current) {
-              console.log('Final countdown completed, setting autoStartNext and calling onNextPhrase');
               // Set both state and ref/sessionStorage flag to ensure auto-start works even with race conditions and re-mounts
               // IMPORTANT: Set flag FIRST, synchronously, before calling onNextPhrase
               setAutoStartFlag(true); // Set ref and sessionStorage immediately (synchronous) - this must happen first!
@@ -345,12 +327,10 @@ export default function ShadowingPlayer({
               // Call onNextPhrase synchronously after setting the ref
               // The ref will be checked in useEffect when phrase changes
               if (onNextPhrase) {
-                console.log('Calling onNextPhrase callback immediately, autoStartNextRef.current:', autoStartNextRef.current);
                 onNextPhrase();
               }
             } else {
               // No more phrases or playback stopped - close fullscreen
-              console.log('No more phrases or playback stopped, closing fullscreen');
               setIsPlaying(false);
               isPlayingRef.current = false;
               setIsFullscreen(false);
@@ -360,7 +340,8 @@ export default function ShadowingPlayer({
         }, 1000);
       }
     } catch (error) {
-      console.error('Error playing phrase:', error);
+      setTtsEngineUsed(ttsService.getLastEngineUsed());
+      setTtsError(ttsService.getLastError() || 'Speech playback failed');
       // CRITICAL: Check if paused BEFORE closing fullscreen (use ref to avoid race conditions)
       // If paused, keep fullscreen active - don't close it
       if (isPausedRef.current || isPaused) {
@@ -455,7 +436,6 @@ export default function ShadowingPlayer({
             // Check if this is the final countdown (after all repetitions)
             if (wasFinalCountdown) {
               // This is the final countdown - handle onNextPhrase/onComplete
-              console.log('Resumed final countdown completed - handling onNextPhrase/onComplete');
               // Clear pause tracking
               pausedDuringSpeechRef.current = false;
               wasSpeakingRef.current = false;
@@ -463,15 +443,12 @@ export default function ShadowingPlayer({
               
               // Use the same logic as the normal final countdown
               if (hasNextPhrase && onNextPhrase) {
-                console.log('Final countdown completed (resumed), setting autoStartNext and calling onNextPhrase');
                 setAutoStartFlag(true);
                 setAutoStartNext(true);
                 if (onNextPhrase) {
-                  console.log('Calling onNextPhrase callback immediately, autoStartNextRef.current:', autoStartNextRef.current);
                   onNextPhrase();
                 }
               } else {
-                console.log('No more phrases (resumed), closing fullscreen');
                 setIsPlaying(false);
                 isPlayingRef.current = false;
                 setIsFullscreen(false);
@@ -493,7 +470,6 @@ export default function ShadowingPlayer({
               } else {
                 // This shouldn't happen - if we're not in final countdown, we shouldn't reach here
                 // But handle it gracefully
-                console.warn('Resumed countdown but nextRepetition >= repetitions - this should not happen');
                 pausedDuringSpeechRef.current = false;
                 wasSpeakingRef.current = false;
                 pausedCountdownRef.current = null;
@@ -596,6 +572,11 @@ export default function ShadowingPlayer({
             {isSilentMode && (
               <p className="mt-1 text-[11px] md:text-xs text-white/80">
                 Silent mode — voice not supported on this device
+              </p>
+            )}
+            {voiceSettings.provider === 'elevenlabs' && ttsEngineUsed === 'browser' && ttsError && (
+              <p className="mt-1 text-[11px] md:text-xs text-white/80">
+                ElevenLabs failed — using browser voice
               </p>
             )}
           </div>
@@ -713,6 +694,11 @@ export default function ShadowingPlayer({
         {isSilentMode && (
           <p className="mt-2 text-xs text-gray-500">
             Silent mode — voice not supported on this device
+          </p>
+        )}
+        {voiceSettings.provider === 'elevenlabs' && ttsEngineUsed === 'browser' && ttsError && (
+          <p className="mt-1 text-xs text-gray-500">
+            ElevenLabs failed — using browser voice
           </p>
         )}
       </div>

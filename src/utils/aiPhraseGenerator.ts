@@ -167,7 +167,6 @@ export async function generatePhrase(
 
     // Check if generated phrase already exists
     if (existingPhrases.includes(cleanText)) {
-      console.warn('Generated duplicate phrase, retrying...');
       // Retry once
       const retryResponse = await fetch('/api/generate-phrase', {
         method: 'POST',
@@ -196,7 +195,6 @@ export async function generatePhrase(
           source: 'ai-generated' as const,
           isFavorite: false,
         };
-        console.log('Generated AI phrase (retry):', phrase);
         return phrase;
       }
     }
@@ -208,10 +206,8 @@ export async function generatePhrase(
       source: 'ai-generated' as const,
       isFavorite: false,
     };
-    console.log('Generated AI phrase:', phrase);
     return phrase;
   } catch (error) {
-    console.error('Error generating phrase:', error);
     // Don't fallback to standard phrases - throw error so caller can handle it
     throw error;
   }

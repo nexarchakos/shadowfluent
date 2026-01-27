@@ -1,4 +1,5 @@
 import { ShadowingSettings, VoiceSettings, TranslationLanguage } from '../types';
+import { ttsService } from '../utils/tts';
 import { ArrowLeft, Volume2, Repeat, Clock, Languages } from 'lucide-react';
 
 interface SettingsPageProps {
@@ -141,6 +142,49 @@ export default function SettingsPage({
             </div>
 
             <div className="space-y-6">
+              <div>
+                <label className="block text-lg font-medium text-gray-700 mb-4">
+                  Voice Engine
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() =>
+                      onVoiceSettingsChange({ ...voiceSettings, provider: 'browser' })
+                    }
+                    className={`p-6 rounded-xl border-2 transition-all ${
+                      voiceSettings.provider === 'browser'
+                        ? 'border-primary-600 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">🌐</div>
+                      <div className="font-semibold text-lg">Browser Voice</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() =>
+                      onVoiceSettingsChange({ ...voiceSettings, provider: 'elevenlabs' })
+                    }
+                    className={`p-6 rounded-xl border-2 transition-all ${
+                      voiceSettings.provider === 'elevenlabs'
+                        ? 'border-primary-600 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">🎙️</div>
+                      <div className="font-semibold text-lg">Real Human Voice</div>
+                    </div>
+                  </button>
+                </div>
+                {voiceSettings.provider === 'elevenlabs' && !ttsService.isElevenLabsConfigured() && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    ElevenLabs δεν είναι ρυθμισμένο — γίνεται χρήση browser voice.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-lg font-medium text-gray-700 mb-4">
                   Voice Gender

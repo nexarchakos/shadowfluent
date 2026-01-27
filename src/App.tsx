@@ -26,7 +26,6 @@ function App() {
   const pathnameCategory = location.pathname.slice(1); // Remove leading '/'
   const actualCategoryParam = categoryParam || (pathnameCategory && pathnameCategory !== '' ? pathnameCategory : undefined);
   
-  console.log('App render - location:', location.pathname, 'params:', params, 'categoryParam:', categoryParam, 'actualCategoryParam:', actualCategoryParam);
   
   const [currentView, setCurrentView] = useState<View>('main');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -47,6 +46,7 @@ function App() {
     gender: 'female',
     accent: 'british',
     rate: 'normal',
+    provider: 'elevenlabs',
   });
 
   const [translationLanguage, setTranslationLanguage] = useState<TranslationLanguage>('el');
@@ -81,28 +81,23 @@ function App() {
 
   // Update category when URL changes
   useEffect(() => {
-    console.log('Category param changed:', actualCategoryParam);
     if (actualCategoryParam) {
       const category = urlSlugToCategory(actualCategoryParam);
       // If not found in mapping, try direct match (for categories that use same slug)
       const finalCategory = category || (Object.keys(mockPhrases).includes(actualCategoryParam) ? actualCategoryParam as Category : null);
       
-      console.log('URL slug:', actualCategoryParam, '→ Category:', finalCategory);
       
       if (finalCategory && Object.keys(mockPhrases).includes(finalCategory)) {
-        console.log('Setting category:', finalCategory, 'Phrases:', mockPhrases[finalCategory].length);
         setSelectedCategory(finalCategory);
         setPhrases(mockPhrases[finalCategory]);
         setSelectedPhrase(null);
       } else {
-        console.warn('Invalid category:', actualCategoryParam);
         // Invalid category - clear selection
         setSelectedCategory(null);
         setPhrases([]);
         setSelectedPhrase(null);
       }
     } else {
-      console.log('No category param, clearing selection');
       setSelectedCategory(null);
       setPhrases([]);
       setSelectedPhrase(null);
@@ -123,27 +118,21 @@ function App() {
       const existingTexts = phrases.map(p => p.text);
       const newPhrase = await generatePhrase(selectedCategory, existingTexts);
       
-      console.log('Generated phrase:', newPhrase);
-      console.log('Phrase source:', newPhrase.source);
       
       // Double-check for duplicates before adding
       if (!phrases.some(p => p.text === newPhrase.text)) {
         setPhrases((prev) => {
           const updated = [newPhrase, ...prev];
-          console.log('Updated phrases count:', updated.length);
-          console.log('First phrase source:', updated[0]?.source);
           return updated;
         });
         setSelectedPhrase(newPhrase);
       } else {
-        console.warn('Duplicate phrase detected, generating another one...');
         // Retry once
         const retryPhrase = await generatePhrase(selectedCategory, [...existingTexts, newPhrase.text]);
         setPhrases((prev) => [retryPhrase, ...prev]);
         setSelectedPhrase(retryPhrase);
       }
     } catch (error) {
-      console.error('Error generating phrase:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.includes('API key') || errorMessage.includes('not configured')) {
         alert('OpenAI API key is not configured or invalid.\n\nPlease:\n1. Check your .env file\n2. Make sure the API key is correct\n3. Restart the dev server (npm run dev)');
@@ -170,7 +159,6 @@ function App() {
       // Generate phrases in parallel for speed, but with retry logic
       const generateWithRetry = async (attempt: number = 0): Promise<Phrase | null> => {
         if (attempt >= 3) {
-          console.warn('Failed to generate unique phrase after 3 attempts');
           return null;
         }
         
@@ -182,11 +170,9 @@ function App() {
           if (!allExistingTexts.includes(phrase.text)) {
             return phrase;
           } else {
-            console.warn(`Duplicate detected, retrying (attempt ${attempt + 1})...`);
             return await generateWithRetry(attempt + 1);
           }
         } catch (error) {
-          console.error(`Error generating phrase (attempt ${attempt + 1}):`, error);
           if (attempt < 2) {
             return await generateWithRetry(attempt + 1);
           }
@@ -210,19 +196,15 @@ function App() {
       }
       
       if (newPhrases.length > 0) {
-        console.log(`Generated ${newPhrases.length}/${count} phrases:`, newPhrases.map(p => ({ text: p.text, source: p.source })));
         setPhrases((prev) => {
           const updated = [...newPhrases, ...prev];
-          console.log('Updated phrases after batch:', updated.length);
           return updated;
         });
         setSelectedPhrase(newPhrases[0]);
       } else {
-        console.warn('No phrases were generated successfully');
         alert(`Failed to generate phrases. Only ${newPhrases.length} out of ${count} were created. Please check your OpenAI API key and try again.`);
       }
     } catch (error) {
-      console.error('Error generating batch phrases:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.includes('API key')) {
         alert('OpenAI API key is not configured or invalid. Please check your .env file and restart the dev server.');
@@ -337,7 +319,6 @@ function App() {
     setPhrases((prev) => [...newPhrases, ...prev]);
     if (newPhrases.length > 0) {
       setSelectedPhrase(newPhrases[0]);
-      console.log(`✅ Added ${newPhrases.length} phrases from text`);
       
       // Show success message
       alert(`✅ Successfully added ${newPhrases.length} phrases!\n\nThe phrases appear at the beginning of the list.`);
@@ -429,13 +410,11 @@ function App() {
       setPhrases((prev) => [...newPhrases, ...prev]);
       if (newPhrases.length > 0) {
         setSelectedPhrase(newPhrases[0]);
-        console.log(`✅ Uploaded ${newPhrases.length} phrases`);
         
         // Show success message
         alert(`✅ Successfully uploaded ${newPhrases.length} phrases!\n\nThe phrases appear at the beginning of the list.`);
       }
     } catch (error) {
-      console.error('Error processing file:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error processing the file';
       if (!errorMessage.includes('Binary .doc')) {
         alert(`Error processing the file. Please make sure it's a valid .txt, .docx, or .doc file.\n\n${errorMessage}`);
@@ -464,7 +443,6 @@ function App() {
   // Main content component
   const MainContent = () => {
     // Debug: Check if selectedCategory is set
-    console.log('MainContent render - selectedCategory:', selectedCategory, 'phrases:', phrases.length);
     
     return (
     <div className="min-h-screen p-4 md:p-8">
@@ -659,7 +637,6 @@ function App() {
                   translationLanguage={translationLanguage}
                   onComplete={() => {
                     // Session completed
-                    console.log('Session completed');
                   }}
                   onNextPhrase={() => {
                     const filteredPhrases = showFavoritesOnly 
@@ -691,7 +668,6 @@ function App() {
                     
                     const currentIndex = filteredPhrases.findIndex(p => p.id === selectedPhrase.id);
                     const hasNext = currentIndex >= 0 && currentIndex < filteredPhrases.length - 1;
-                    console.log('hasNextPhrase check - currentIndex:', currentIndex, 'filteredPhrases.length:', filteredPhrases.length, 'hasNext:', hasNext, 'showFavoritesOnly:', showFavoritesOnly);
                     return hasNext;
                   })()}
                   hasPrevPhrase={(() => {

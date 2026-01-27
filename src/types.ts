@@ -21,6 +21,7 @@ export type Category =
 export type VoiceGender = 'male' | 'female';
 export type VoiceAccent = 'british' | 'american' | 'australian' | 'irish' | 'canadian';
 export type SpeechRate = 'slow' | 'normal' | 'fast';
+export type VoiceProvider = 'browser' | 'elevenlabs';
 
 export type TranslationLanguage = 'el' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'ru' | 'zh' | 'ja' | 'ko' | 'ar' | 'none';
 
@@ -28,6 +29,7 @@ export interface VoiceSettings {
   gender: VoiceGender;
   accent: VoiceAccent;
   rate: SpeechRate;
+  provider: VoiceProvider;
 }
 
 export interface TranslationSettings {

@@ -27,14 +27,12 @@ export async function translateWithAI(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('Translation error:', errorData.error || response.statusText);
       return '';
     }
 
     const data = await response.json();
     return data.translation || '';
   } catch (error) {
-    console.error('Error translating:', error);
     return '';
   }
 }

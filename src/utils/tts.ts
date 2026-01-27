@@ -301,18 +301,11 @@ export class TTSService {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       this.currentAudio = audio;
+      audio.preload = 'auto';
+      (audio as any).playsInline = true;
+      audio.load();
 
-      await new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error('ElevenLabs audio error'));
-        };
-        audio.play().catch(reject);
-      });
+      await this.playAudio(audio, url);
       return;
     }
 
@@ -350,17 +343,67 @@ export class TTSService {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     this.currentAudio = audio;
+    audio.preload = 'auto';
+    (audio as any).playsInline = true;
+    audio.load();
 
-    await new Promise<void>((resolve, reject) => {
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
+    await this.playAudio(audio, url);
+  }
+
+  private async playAudio(audio: HTMLAudioElement, url?: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let startTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        cleanup();
+        reject(new Error('ElevenLabs audio start timeout'));
+      }, 6000);
+      let endTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const clearTimers = () => {
+        if (startTimeout) {
+          clearTimeout(startTimeout);
+          startTimeout = null;
+        }
+        if (endTimeout) {
+          clearTimeout(endTimeout);
+          endTimeout = null;
+        }
+      };
+
+      const cleanup = () => {
+        clearTimers();
+        if (url) {
+          URL.revokeObjectURL(url);
+        }
+      };
+
+      const finish = () => {
+        cleanup();
         resolve();
       };
+
+      audio.onplay = () => {
+        if (startTimeout) {
+          clearTimeout(startTimeout);
+          startTimeout = null;
+        }
+        const duration = audio.duration;
+        if (Number.isFinite(duration) && duration > 0) {
+          endTimeout = setTimeout(() => {
+            finish();
+          }, Math.ceil(duration * 1000) + 1000);
+        }
+      };
+
+      audio.onended = () => finish();
       audio.onerror = () => {
-        URL.revokeObjectURL(url);
+        cleanup();
         reject(new Error('ElevenLabs audio error'));
       };
-      audio.play().catch(reject);
+
+      audio.play().catch((error) => {
+        cleanup();
+        reject(error instanceof Error ? error : new Error('ElevenLabs play failed'));
+      });
     });
   }
 

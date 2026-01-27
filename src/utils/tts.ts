@@ -3,6 +3,23 @@ import { VoiceSettings } from '../types';
 const ELEVEN_PROXY_URL = (import.meta.env.VITE_ELEVENLABS_PROXY_URL as string | undefined) || '/api/elevenlabs-tts';
 const ELEVEN_PROXY_ENABLED = (import.meta.env.VITE_ELEVENLABS_PROXY_ENABLED as string | undefined) === 'true';
 
+// Direct client-side mode (for local dev only)
+const ELEVEN_DIRECT_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY as string | undefined;
+const ELEVEN_DIRECT_VOICE_DEFAULT = import.meta.env.VITE_ELEVENLABS_VOICE_DEFAULT as string | undefined;
+const ELEVEN_DIRECT_VOICE_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_FEMALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_BRITISH_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_BRITISH_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_AMERICAN_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_AMERICAN_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_AUSTRALIAN_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_AUSTRALIAN_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_IRISH_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_IRISH_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_CANADIAN_MALE = import.meta.env.VITE_ELEVENLABS_VOICE_CANADIAN_MALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_BRITISH_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_BRITISH_FEMALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_AMERICAN_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_AMERICAN_FEMALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_AUSTRALIAN_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_AUSTRALIAN_FEMALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_IRISH_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_IRISH_FEMALE as string | undefined;
+const ELEVEN_DIRECT_VOICE_CANADIAN_FEMALE = import.meta.env.VITE_ELEVENLABS_VOICE_CANADIAN_FEMALE as string | undefined;
+const ELEVEN_DIRECT_MODEL = import.meta.env.VITE_ELEVENLABS_MODEL as string | undefined;
+
 export class TTSService {
   private synth: SpeechSynthesis | null;
   private voices: SpeechSynthesisVoice[] = [];
@@ -213,7 +230,92 @@ export class TTSService {
     return voice || null;
   }
 
+  private getDirectVoiceId(settings: VoiceSettings): string | null {
+    const byAccentMale: Record<string, string | undefined> = {
+      british: ELEVEN_DIRECT_VOICE_BRITISH_MALE,
+      american: ELEVEN_DIRECT_VOICE_AMERICAN_MALE,
+      australian: ELEVEN_DIRECT_VOICE_AUSTRALIAN_MALE,
+      irish: ELEVEN_DIRECT_VOICE_IRISH_MALE,
+      canadian: ELEVEN_DIRECT_VOICE_CANADIAN_MALE,
+    };
+    const byAccentFemale: Record<string, string | undefined> = {
+      british: ELEVEN_DIRECT_VOICE_BRITISH_FEMALE,
+      american: ELEVEN_DIRECT_VOICE_AMERICAN_FEMALE,
+      australian: ELEVEN_DIRECT_VOICE_AUSTRALIAN_FEMALE,
+      irish: ELEVEN_DIRECT_VOICE_IRISH_FEMALE,
+      canadian: ELEVEN_DIRECT_VOICE_CANADIAN_FEMALE,
+    };
+
+    if (settings.gender === 'male') {
+      const accentVoice = byAccentMale[settings.accent];
+      if (accentVoice) return accentVoice;
+      if (ELEVEN_DIRECT_VOICE_MALE) return ELEVEN_DIRECT_VOICE_MALE;
+    }
+    if (settings.gender === 'female') {
+      const accentVoice = byAccentFemale[settings.accent];
+      if (accentVoice) return accentVoice;
+      if (ELEVEN_DIRECT_VOICE_FEMALE) return ELEVEN_DIRECT_VOICE_FEMALE;
+    }
+    return ELEVEN_DIRECT_VOICE_DEFAULT || null;
+  }
+
   private async speakElevenLabs(text: string, settings: VoiceSettings): Promise<void> {
+    if (!ELEVEN_PROXY_ENABLED) {
+      const voiceId = this.getDirectVoiceId(settings);
+      if (!ELEVEN_DIRECT_API_KEY || !voiceId) return;
+
+      if (this.currentAbort) {
+        this.currentAbort.abort();
+        this.currentAbort = null;
+      }
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
+
+      const controller = new AbortController();
+      this.currentAbort = controller;
+
+      const modelId = ELEVEN_DIRECT_MODEL || 'eleven_multilingual_v2';
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVEN_DIRECT_API_KEY,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: modelId,
+          voice_settings: { stability: 0.4, similarity_boost: 0.8 },
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => '');
+        throw new Error(`ElevenLabs error: ${response.status}${responseText ? ` - ${responseText}` : ''}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      this.currentAudio = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          resolve();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('ElevenLabs audio error'));
+        };
+        audio.play().catch(reject);
+      });
+      return;
+    }
+
     if (this.currentAbort) {
       this.currentAbort.abort();
       this.currentAbort = null;
@@ -381,7 +483,23 @@ export class TTSService {
   }
 
   isElevenLabsConfigured(): boolean {
-    return ELEVEN_PROXY_ENABLED;
+    const directHasVoice = Boolean(
+      ELEVEN_DIRECT_VOICE_DEFAULT ||
+      ELEVEN_DIRECT_VOICE_MALE ||
+      ELEVEN_DIRECT_VOICE_FEMALE ||
+      ELEVEN_DIRECT_VOICE_BRITISH_MALE ||
+      ELEVEN_DIRECT_VOICE_AMERICAN_MALE ||
+      ELEVEN_DIRECT_VOICE_AUSTRALIAN_MALE ||
+      ELEVEN_DIRECT_VOICE_IRISH_MALE ||
+      ELEVEN_DIRECT_VOICE_CANADIAN_MALE ||
+      ELEVEN_DIRECT_VOICE_BRITISH_FEMALE ||
+      ELEVEN_DIRECT_VOICE_AMERICAN_FEMALE ||
+      ELEVEN_DIRECT_VOICE_AUSTRALIAN_FEMALE ||
+      ELEVEN_DIRECT_VOICE_IRISH_FEMALE ||
+      ELEVEN_DIRECT_VOICE_CANADIAN_FEMALE
+    );
+    const directConfigured = Boolean(ELEVEN_DIRECT_API_KEY && directHasVoice);
+    return ELEVEN_PROXY_ENABLED || directConfigured;
   }
 
   isAvailable(settings: VoiceSettings): boolean {

@@ -574,6 +574,11 @@ export default function ShadowingPlayer({
                 Silent mode — voice not supported on this device
               </p>
             )}
+            {voiceSettings.provider === 'elevenlabs' && !ttsService.isElevenLabsConfigured() && (
+              <p className="mt-1 text-[11px] md:text-xs text-white/80">
+                ElevenLabs δεν είναι ρυθμισμένο — γίνεται χρήση browser voice.
+              </p>
+            )}
             {voiceSettings.provider === 'elevenlabs' && ttsEngineUsed === 'browser' && ttsError && (
               <p className="mt-1 text-[11px] md:text-xs text-white/80">
                 ElevenLabs failed — using browser voice
@@ -694,6 +699,11 @@ export default function ShadowingPlayer({
         {isSilentMode && (
           <p className="mt-2 text-xs text-gray-500">
             Silent mode — voice not supported on this device
+          </p>
+        )}
+        {voiceSettings.provider === 'elevenlabs' && !ttsService.isElevenLabsConfigured() && (
+          <p className="mt-1 text-xs text-gray-500">
+            ElevenLabs δεν είναι ρυθμισμένο — γίνεται χρήση browser voice.
           </p>
         )}
         {voiceSettings.provider === 'elevenlabs' && ttsEngineUsed === 'browser' && ttsError && (
